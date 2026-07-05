@@ -52,6 +52,16 @@ class TicketService:
         return TicketRepository.create(conn, customer_id, subject, priority)
 
     @staticmethod
+    def get_ticket(conn: Connection, ticket_id: str) -> Optional[Ticket]:
+        return TicketRepository.get_by_id(conn, ticket_id)
+
+    @staticmethod
+    def list_tickets(conn: Connection, current_user: dict) -> list[Ticket]:
+        if current_user["role"] == "agent":
+            return TicketRepository.list_all(conn)
+        return TicketRepository.list_by_customer(conn, str(current_user["id"]))
+
+    @staticmethod
     def transition_status(
         conn: Connection,
         ticket_id: str,

@@ -22,3 +22,23 @@ def get_db() -> Generator[Connection, None, None]:
 
 
 DbDep = Annotated[Connection, Depends(get_db)]
+
+
+# ── Service / Repository deps ────────────────────────────────────────────
+
+from app.repositories.conversation_repository import ConversationRepository
+from app.services.ticket_service import TicketService
+
+
+def get_ticket_service() -> TicketService:
+    return TicketService()
+
+
+TicketServiceDep = Annotated[TicketService, Depends(get_ticket_service)]
+
+
+def get_conversation_repo() -> ConversationRepository:
+    return ConversationRepository()
+
+
+ConversationRepoDep = Annotated[ConversationRepository, Depends(get_conversation_repo)]

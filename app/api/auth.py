@@ -10,7 +10,7 @@ from typing import Annotated
 import bcrypt
 import jwt
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from psycopg import Connection
 
 from app.api.deps import get_db
@@ -44,10 +44,10 @@ def decode_access_token(token: str) -> dict:
 
 
 def get_current_user(
-    token: Annotated[str, Depends(security)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
     db: Annotated[Connection, Depends(get_db)],
 ) -> dict:
-    payload = decode_access_token(token)
+    payload = decode_access_token(credentials.credentials)
     customer_id: str = payload.get("sub")
     role: str = payload.get("role")
     if customer_id is None or role is None:
@@ -70,7 +70,7 @@ def get_current_user(
         )
 
     return {
-        "id": row[0],
+        "id": str(row[0]),
         "email": row[1],
         "full_name": row[2],
         "role": row[3],
@@ -116,7 +116,7 @@ def get_customer_by_email(db: Connection, email: str) -> dict | None:
     if row is None:
         return None
     return {
-        "id": row[0],
+        "id": str(row[0]),
         "email": row[1],
         "full_name": row[2],
         "password_hash": row[3],
