@@ -160,6 +160,7 @@ docker-compose.override.yml
 
 
 temp.txt
+testing.txt
 .opencode
 AGENTS.md
 COMPLETION_CHECKLIST_PER_SPEC.md
