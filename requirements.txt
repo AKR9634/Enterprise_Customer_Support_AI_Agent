@@ -1,0 +1,2 @@
+# Pinned Python dependencies: fastapi, uvicorn, psycopg, pydantic,
+# langgraph, qdrant-client, anthropic, pytest, httpx.
