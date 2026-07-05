@@ -29,8 +29,50 @@ class TokenResponse(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: int
+    id: str
     email: str
     full_name: str
     role: str
     created_at: datetime
+
+
+# ── Tickets ──────────────────────────────────────────────────────────────
+
+class TicketCreate(BaseModel):
+    subject: str
+    priority: str = "normal"
+
+
+class TicketResponse(BaseModel):
+    id: str
+    customer_id: str
+    subject: str
+    status: str
+    priority: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class TicketListResponse(BaseModel):
+    tickets: list[TicketResponse]
+
+
+class StatusUpdate(BaseModel):
+    status: str
+
+
+class MessageResponse(BaseModel):
+    id: str
+    ticket_id: str
+    role: str
+    content: str
+    created_at: datetime
+
+
+class ConversationResponse(BaseModel):
+    messages: list[MessageResponse]
+
+
+class TicketDetailResponse(BaseModel):
+    ticket: TicketResponse
+    conversation: ConversationResponse

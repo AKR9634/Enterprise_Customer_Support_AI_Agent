@@ -51,6 +51,12 @@ class TicketRepository:
             return _row_to_ticket(row)
 
     @staticmethod
+    def list_all(conn: Connection) -> list[Ticket]:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM tickets ORDER BY created_at DESC")
+            return [_row_to_ticket(row) for row in cur.fetchall()]
+
+    @staticmethod
     def list_by_customer(conn: Connection, customer_id: str) -> list[Ticket]:
         with conn.cursor() as cur:
             cur.execute(
