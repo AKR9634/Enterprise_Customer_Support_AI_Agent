@@ -90,6 +90,18 @@ def require_role(required_role: str):
     return role_checker
 
 
+# ── Shared authorization helpers ─────────────────────────────────────────
+
+def check_ownership(current_user: dict, ticket_customer_id: str | int) -> None:
+    """Raise 404 if the current user is not an agent and does not own the ticket."""
+    if current_user["role"] != "agent":
+        if str(current_user["id"]) != str(ticket_customer_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Ticket not found",
+            )
+
+
 # ── Customer helpers (no dedicated repository layer yet) ────────────────
 
 def create_customer(db: Connection, email: str, full_name: str, password: str) -> int:

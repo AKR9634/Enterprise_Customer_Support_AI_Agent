@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from psycopg import Connection
 
-from app.api.auth import get_current_user
+from app.api.auth import check_ownership, get_current_user
 from app.api.deps import ConversationRepoDep, DbDep, TicketServiceDep
 from app.api.schemas import (
     ConversationResponse,
@@ -55,7 +55,7 @@ def get_ticket(
     ticket = ticket_service.get_ticket(db, ticket_id)
     if ticket is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
-    _check_ownership(current_user, ticket.customer_id)
+    check_ownership(current_user, ticket.customer_id)
 
     messages = conversation_repo.list_by_ticket(db, ticket_id)
     return TicketDetailResponse(
@@ -83,7 +83,7 @@ def update_ticket_status(
     ticket = ticket_service.get_ticket(db, ticket_id)
     if ticket is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
-    _check_ownership(current_user, ticket.customer_id)
+    check_ownership(current_user, ticket.customer_id)
 
     try:
         updated = ticket_service.transition_status(db, ticket_id, body.status)
@@ -106,12 +106,3 @@ def _ticket_to_response(ticket) -> TicketResponse:
         created_at=ticket.created_at,
         updated_at=ticket.updated_at,
     )
-
-
-def _check_ownership(current_user: dict, ticket_customer_id) -> None:
-    if current_user["role"] != "agent":
-        if str(current_user["id"]) != str(ticket_customer_id):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Ticket not found",
-            )
