@@ -42,3 +42,15 @@ def get_conversation_repo() -> ConversationRepository:
 
 
 ConversationRepoDep = Annotated[ConversationRepository, Depends(get_conversation_repo)]
+
+
+# ── LLM deps ──────────────────────────────────────────────────────────────
+
+from app.llm.provider import LLMClient
+
+
+def get_llm_client() -> LLMClient:
+    return LLMClient()
+
+
+LlmClientDep = Annotated[LLMClient, Depends(get_llm_client)]

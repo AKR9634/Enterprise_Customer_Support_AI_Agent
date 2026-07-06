@@ -23,3 +23,10 @@ LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
 OPEN_ROUTER_BASE_URL: str = os.getenv("OPEN_ROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.0"))
 LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "1024"))
+
+# ── Graph / Escalation ────────────────────────────────────────────────────────
+CONFIDENCE_THRESHOLD: float = float(os.getenv("CONFIDENCE_THRESHOLD", "0.7"))
+ESCALATION_ACKNOWLEDGMENT: str = os.getenv(
+    "ESCALATION_ACKNOWLEDGMENT",
+    "Thank you for reaching out. We've escalated your request to a human agent who will follow up shortly.",
+)
