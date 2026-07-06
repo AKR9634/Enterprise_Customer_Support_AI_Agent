@@ -17,3 +17,9 @@ QDRANT_COLLECTION: str = os.getenv("QDRANT_COLLECTION", "knowledge_base")
 EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "500"))
 CHUNK_OVERLAP: int = int(os.getenv("CHUNK_OVERLAP", "50"))
+
+# ── LLM Provider ─────────────────────────────────────────────────────────────
+LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
+OPEN_ROUTER_BASE_URL: str = os.getenv("OPEN_ROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.0"))
+LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "1024"))
