@@ -10,6 +10,9 @@ If *docs_dir* is omitted, defaults to ``docs/``.
 """
 
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.rag.ingest import run_ingestion
 
