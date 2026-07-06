@@ -246,8 +246,8 @@ def run_ingestion(
     upserted = _upsert_chunks(chunks, embeddings, collection_name=collection_name)
 
     print(
-        f"Ingested {total_docs} doc(s) \u2192 {total_chunks} chunk(s) "
-        f"\u2192 upserted {upserted} point(s) to '{collection_name}'"
+        f"Ingested {total_docs} doc(s) -> {total_chunks} chunk(s) "
+        f"-> upserted {upserted} point(s) to '{collection_name}'"
     )
 
     return {
