@@ -7,7 +7,7 @@ navigation overhead without real benefit.
 
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 # ── Auth ────────────────────────────────────────────────────────────────
@@ -76,3 +76,17 @@ class ConversationResponse(BaseModel):
 class TicketDetailResponse(BaseModel):
     ticket: TicketResponse
     conversation: ConversationResponse
+
+
+# ── Chat ─────────────────────────────────────────────────────────────────
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    ticket_id: str | None = None
+
+
+class ChatResponse(BaseModel):
+    ticket_id: str
+    response: str
+    escalated: bool
+    escalation_reason: str | None = None

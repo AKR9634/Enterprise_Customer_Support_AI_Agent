@@ -30,3 +30,8 @@ ESCALATION_ACKNOWLEDGMENT: str = os.getenv(
     "ESCALATION_ACKNOWLEDGMENT",
     "Thank you for reaching out. We've escalated your request to a human agent who will follow up shortly.",
 )
+
+# ── LangSmith Tracing ──────────────────────────────────────────────────────────
+LANGSMITH_TRACING: bool = os.getenv("LANGSMITH_TRACING", "false").lower() == "true"
+LANGSMITH_API_KEY: str = os.getenv("LANGSMITH_API_KEY", "")
+LANGSMITH_PROJECT: str = os.getenv("LANGSMITH_PROJECT", "Enterprise-Customer-Support-AI-Agent")
