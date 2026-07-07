@@ -4,6 +4,7 @@ from app.repositories.product_repository import ProductRepository, Product
 from app.repositories.order_repository import OrderRepository, Order, OrderItem
 from app.repositories.subscription_repository import SubscriptionRepository, Subscription
 from app.repositories.invoice_repository import InvoiceRepository, Invoice
+from app.repositories.escalation_repository import EscalationRepository, Escalation
 
 __all__ = [
     "TicketRepository",
@@ -19,4 +20,6 @@ __all__ = [
     "Subscription",
     "InvoiceRepository",
     "Invoice",
+    "EscalationRepository",
+    "Escalation",
 ]
