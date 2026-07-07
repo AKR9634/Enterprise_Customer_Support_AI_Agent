@@ -20,16 +20,22 @@ def render_generic_agent_prompt(
     conversation_history: list[dict[str, str]] | None = None,
     retrieved_docs: list[dict[str, Any]] | None = None,
     business_data: dict[str, Any] | None = None,
+    role_description: str | None = None,
 ) -> str:
-    """Render a single-turn generic support agent prompt.
+    """Render a single-turn support agent prompt.
 
+    The *role_description* overrides the default role line when a
+    specialist wants a distinct persona (billing, order, etc.).
     The agent is grounded in the retrieved knowledge docs and any
     business data (order / payment records).  If no context is
     available the agent must say so rather than invent answers.
     """
     lines: list[str] = []
 
-    lines.append("You are a helpful customer support agent.")
+    if role_description:
+        lines.append(role_description)
+    else:
+        lines.append("You are a helpful customer support agent.")
     lines.append(
         "Answer the customer's question using only the context provided below."
     )
