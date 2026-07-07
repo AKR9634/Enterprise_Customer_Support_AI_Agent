@@ -9,6 +9,7 @@ class SupportState(TypedDict, total=False):
     """
 
     ticket_id: str
+    customer_id: str
     customer_message: str
     conversation_history: list[dict]
     category: str | None

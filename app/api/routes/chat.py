@@ -42,6 +42,7 @@ def send_message(
 
     initial_state = SupportState(
         ticket_id=ticket_id,
+        customer_id=str(current_user["id"]),
         customer_message=body.message,
     )
 
