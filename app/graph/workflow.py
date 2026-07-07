@@ -10,6 +10,7 @@ from typing import Any
 
 from langgraph.graph import END, StateGraph
 
+from app.graph.nodes.business_data import BusinessDataNode
 from app.graph.nodes.classify import ClassifyNode
 from app.graph.nodes.context import ContextNode
 from app.graph.nodes.decide import DecideNode
@@ -38,6 +39,7 @@ def build_graph(
     classify = ClassifyNode(llm=llm)
     context = ContextNode(conn=conn)  # type: ignore[arg-type]
     retrieve = RetrieveNode()
+    business_data = BusinessDataNode(conn=conn)  # type: ignore[arg-type]
     generate = GenerateNode(llm=llm)
     verify = VerifyNode(llm=llm)
     decide = DecideNode()
@@ -47,6 +49,7 @@ def build_graph(
     builder.add_node("classify", classify)
     builder.add_node("context", context)
     builder.add_node("retrieve", retrieve)
+    builder.add_node("business_data", business_data)
     builder.add_node("generate", generate)
     builder.add_node("verify", verify)
     builder.add_node("decide", decide)
@@ -54,7 +57,8 @@ def build_graph(
     builder.set_entry_point("classify")
     builder.add_edge("classify", "context")
     builder.add_edge("context", "retrieve")
-    builder.add_edge("retrieve", "generate")
+    builder.add_edge("retrieve", "business_data")
+    builder.add_edge("business_data", "generate")
     builder.add_edge("generate", "verify")
     builder.add_edge("verify", "decide")
     builder.add_edge("decide", END)
