@@ -16,6 +16,7 @@ from app.graph.nodes.context import ContextNode
 from app.graph.nodes.decide import DecideNode
 from app.graph.nodes.generate import GenerateNode
 from app.graph.nodes.retrieve import RetrieveNode
+from app.graph.nodes.route import RouteNode
 from app.graph.nodes.verify import VerifyNode
 from app.graph.state import SupportState
 from app.llm.provider import LLMClient
@@ -32,14 +33,15 @@ def build_graph(
 ) -> StateGraph:
     """Construct the LangGraph state graph.
 
-    Phase 3 wiring — Nodes 1-3 and 6-8 are wired linearly.
-    Nodes 4 (business_data) and 5 (route) are Phase 4 and remain
-    omitted until their implementation steps.
+    All 8 nodes are wired linearly:
+    classify -> context -> retrieve -> business_data -> route
+    -> generate -> verify -> decide.
     """
     classify = ClassifyNode(llm=llm)
     context = ContextNode(conn=conn)  # type: ignore[arg-type]
     retrieve = RetrieveNode()
     business_data = BusinessDataNode(conn=conn)  # type: ignore[arg-type]
+    route = RouteNode(llm=llm)
     generate = GenerateNode(llm=llm)
     verify = VerifyNode(llm=llm)
     decide = DecideNode()
@@ -50,6 +52,7 @@ def build_graph(
     builder.add_node("context", context)
     builder.add_node("retrieve", retrieve)
     builder.add_node("business_data", business_data)
+    builder.add_node("route", route)
     builder.add_node("generate", generate)
     builder.add_node("verify", verify)
     builder.add_node("decide", decide)
@@ -58,7 +61,8 @@ def build_graph(
     builder.add_edge("classify", "context")
     builder.add_edge("context", "retrieve")
     builder.add_edge("retrieve", "business_data")
-    builder.add_edge("business_data", "generate")
+    builder.add_edge("business_data", "route")
+    builder.add_edge("route", "generate")
     builder.add_edge("generate", "verify")
     builder.add_edge("verify", "decide")
     builder.add_edge("decide", END)
