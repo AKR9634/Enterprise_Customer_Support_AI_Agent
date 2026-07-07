@@ -6,6 +6,7 @@ navigation overhead without real benefit.
 """
 
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -139,3 +140,60 @@ class InvoiceOut(BaseModel):
     status: str
     due_date: datetime
     paid_at: datetime | None = None
+
+
+# -- Account / Addresses -------------------------------------------------------
+
+class CustomerProfileOut(BaseModel):
+    id: str
+    email: str
+    full_name: str
+    role: str
+    created_at: datetime
+
+
+class AddressOut(BaseModel):
+    id: str
+    label: str
+    street: str
+    city: str
+    state: str
+    zip: str
+    country: str
+    is_default: bool
+
+
+class AccountMetadataOut(BaseModel):
+    email_verified: bool
+    phone_verified: bool
+    two_factor_enabled: bool
+    account_locked: bool
+    last_login_at: datetime | None = None
+
+
+# -- Products / Catalog --------------------------------------------------------
+
+class ProductSpecOut(BaseModel):
+    key: str
+    value: str
+
+
+class ProductWarrantyOut(BaseModel):
+    duration_months: int
+    terms: str
+
+
+class InventoryOut(BaseModel):
+    stock_count: int
+    low_stock: int
+
+
+class ProductDetailOut(BaseModel):
+    id: str
+    name: str
+    description: str
+    price: Decimal
+    sku: str
+    specifications: list[ProductSpecOut] = []
+    warranty: ProductWarrantyOut | None = None
+    inventory: InventoryOut | None = None

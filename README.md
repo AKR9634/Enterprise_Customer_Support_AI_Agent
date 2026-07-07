@@ -42,7 +42,7 @@ The core design principle carried over from the enterprise version: **the LLM ne
 ## Core Features
 
 1. **Grounded chat support agent** — Replies are backed by Qdrant-retrieved context, not general-knowledge guesses.
-2. **Multi-agent routing** — A Supervisor node classifies intent and hands off to a Billing, Order, or General specialist agent, all sharing one prompt skeleton.
+2. **Multi-agent routing** — A Supervisor node classifies intent and hands off to a Billing, Order, Account, Product, or General specialist agent, all sharing one prompt skeleton.
 3. **Confidence-based escalation** — Low-confidence or ungrounded answers are held back and routed to a human review queue instead of being sent as-is.
 4. **Agent review dashboard** — Humans see escalated tickets with full context (what the AI saw, why it escalated) and reply manually.
 
@@ -119,11 +119,11 @@ The core design principle carried over from the enterprise version: **the LLM ne
 
 | Node | Does | Calls |
 |---|---|---|
-| 1. Classify | Categorizes the message (billing / order / general) | `LLMClient.classify` |
+| 1. Classify | Categorizes the message (billing / order / account / product / general) | `LLMClient.classify` |
 | 2. Context | Loads customer profile + recent conversation history | `TicketService` |
 | 3. Retrieve | Embeds the query, searches Qdrant, assembles cited context | `KnowledgeService.search` |
 | 4. Business data | Fetches order/payment data if the category needs it | Direct DB lookup via services |
-| 5. Route | Supervisor picks the Billing / Order / General agent | `LLMClient.generate` (narrow routing prompt) |
+| 5. Route | Supervisor picks the Billing / Order / Account / Product / General agent | `LLMClient.generate` (narrow routing prompt) |
 | 6. Generate | Selected specialist drafts a response grounded in retrieved context + business data | `LLMClient.generate` |
 | 7. Verify | A separate LLM call checks every factual claim traces back to retrieved context or business data | `LLMClient.generate` |
 | 8. Decide | Combines grounding + confidence; escalates if either fails threshold | `EscalationService.evaluate` |
@@ -133,7 +133,7 @@ The core design principle carried over from the enterprise version: **the LLM ne
 ### Multi-agent design
 
 - **Supervisor** — routing-only responsibility. Receives the category plus a one-line summary of retrieved context and outputs which specialist should answer. Kept deliberately narrow so it stays a clean classification task.
-- **Specialists (Billing, Order, General)** — share one prompt skeleton, differing only in role description and which business-data fields are relevant. Adding a fourth specialist later means one new file, not edits to the others.
+- **Specialists (Billing, Order, Account, Product, General)** — share one prompt skeleton, differing only in role description and which business-data fields are relevant. Adding a new specialist later means one new file, not edits to the others.
 
 ## Folder Structure
 
@@ -167,6 +167,8 @@ Enterprise-Customer-Support-AI-Agent/
         specialist_skeleton.py  # shared prompt shell (role, account data, reference material)
         billing_agent.py        # role description + billing-specific fields
         order_agent.py
+        account_agent.py
+        product_agent.py
         general_agent.py
 
     services/
@@ -281,7 +283,7 @@ Each phase produces a runnable, demoable system rather than a half-built layer. 
 | **1 — Foundation** | Working ticketing system, zero AI | Supabase schema (`0001_init.sql`), `TicketRepository`, `ConversationRepository`, `TicketService` with a status state machine (`open → pending → resolved/escalated → closed`), FastAPI CRUD for tickets/messages, JWT auth |
 | **2 — Knowledge base** | Grounded, cited context — no LLM yet | Seed docs (`faq.md`, `refund_policy.md`, `billing_policy.md`), `rag/ingest.py`, `rag/retriever.py`, `knowledge_service.search()` |
 | **3 — Single-agent graph** | One message flows through the full pipeline | `SupportState`, Nodes 1–3 + 6–8 with one generic agent, `POST /chat/messages` wired to the graph, LangSmith tracing on from the start |
-| **4 — Multi-agent routing** | Category-specific answers with the right tone/data | Node 4 (business data) + Node 5 (Supervisor), Billing/Order/General specialist prompts, `agents_invoked` visible per chat turn |
+| **4 — Multi-agent routing** | Category-specific answers with the right tone/data | Node 4 (business data) + Node 5 (Supervisor), Billing/Order/Account/Product/General specialist prompts, `agents_invoked` visible per chat turn |
 | **5 — Escalation loop** | Low-confidence answers caught and handed to a human | `0002_escalations.sql`, `EscalationService`, escalation queue + review API, agent dashboard UI |
 
 **Sequencing principle:** deterministic before AI, single agent before multi-agent. Phase 3 uses one generic agent so graph-wiring bugs are debugged separately from routing-logic bugs; Phase 4 only adds the routing split once the graph is proven to work.

@@ -11,12 +11,13 @@ __all__ = [
     "BusinessDataNode",
 ]
 
-DATA_CATEGORIES = {"billing", "order"}
+DATA_CATEGORIES = {"billing", "order", "account", "product"}
 
 
 class BusinessDataNode:
     """Graph node that fetches customer business data (orders,
-    subscriptions, invoices) when the category requires it.
+    subscriptions, invoices, account info, product catalog) when
+    the category requires it.
 
     Deterministic — no LLM call involved. Skips all DB lookups for
     categories that do not need business data (e.g. ``general``).
@@ -28,6 +29,7 @@ class BusinessDataNode:
     def __call__(self, state: SupportState) -> dict[str, Any]:
         customer_id = state.get("customer_id")
         category = state.get("category")
+        customer_message = state.get("customer_message", "")
 
         if not customer_id or not category or category not in DATA_CATEGORIES:
             return {"business_data": {}}
@@ -36,5 +38,6 @@ class BusinessDataNode:
             conn=self._conn,
             customer_id=customer_id,
             category=category,
+            query_text=customer_message,
         )
         return {"business_data": data}

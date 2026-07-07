@@ -224,6 +224,159 @@ def _seed_invoices(conn, customers: dict[str, dict]) -> None:
     conn.commit()
 
 
+def _seed_addresses(conn, customers: dict[str, dict]) -> None:
+    addresses = [
+        {
+            "customer_id": customers["alice"]["id"],
+            "label": "Home",
+            "street": "123 Main St",
+            "city": "Springfield",
+            "state": "IL",
+            "zip": "62701",
+            "country": "US",
+            "is_default": True,
+        },
+        {
+            "customer_id": customers["alice"]["id"],
+            "label": "Work",
+            "street": "456 Oak Ave",
+            "city": "Springfield",
+            "state": "IL",
+            "zip": "62702",
+            "country": "US",
+            "is_default": False,
+        },
+    ]
+    with conn.cursor() as cur:
+        for a in addresses:
+            cur.execute(
+                "SELECT COUNT(*) FROM customer_addresses WHERE customer_id = %s AND label = %s",
+                (a["customer_id"], a["label"]),
+            )
+            if cur.fetchone()[0] > 0:
+                continue
+            cur.execute(
+                "INSERT INTO customer_addresses (customer_id, label, street, city, state, zip, country, is_default) "
+                "VALUES (%(customer_id)s, %(label)s, %(street)s, %(city)s, %(state)s, %(zip)s, %(country)s, %(is_default)s)",
+                a,
+            )
+    conn.commit()
+
+
+def _seed_account_metadata(conn, customers: dict[str, dict]) -> None:
+    import datetime as dt
+
+    metadata = [
+        {
+            "customer_id": customers["alice"]["id"],
+            "email_verified": True,
+            "phone_verified": False,
+            "two_factor_enabled": False,
+            "account_locked": False,
+            "last_login_at": dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=1),
+        },
+        {
+            "customer_id": customers["bob"]["id"],
+            "email_verified": True,
+            "phone_verified": True,
+            "two_factor_enabled": True,
+            "account_locked": False,
+            "last_login_at": dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2),
+        },
+    ]
+    with conn.cursor() as cur:
+        for m in metadata:
+            cur.execute(
+                "SELECT COUNT(*) FROM account_metadata WHERE customer_id = %s",
+                (m["customer_id"],),
+            )
+            if cur.fetchone()[0] > 0:
+                continue
+            cur.execute(
+                "INSERT INTO account_metadata (customer_id, email_verified, phone_verified, two_factor_enabled, account_locked, last_login_at) "
+                "VALUES (%(customer_id)s, %(email_verified)s, %(phone_verified)s, %(two_factor_enabled)s, %(account_locked)s, %(last_login_at)s)",
+                m,
+            )
+    conn.commit()
+
+
+def _seed_product_specs(conn, products: dict[str, str]) -> None:
+    specs = [
+        {"product_name": "Widget Pro", "key": "Dimensions", "value": "10 x 5 x 2 inches"},
+        {"product_name": "Widget Pro", "key": "Weight", "value": "1.2 lbs"},
+        {"product_name": "Widget Pro", "key": "Material", "value": "Aluminum alloy"},
+        {"product_name": "Widget Pro", "key": "Color", "value": "Space Gray"},
+        {"product_name": "Gadget X", "key": "Battery Life", "value": "24 hours"},
+        {"product_name": "Gadget X", "key": "Weight", "value": "0.8 lbs"},
+        {"product_name": "Gadget X", "key": "Connectivity", "value": "Bluetooth 5.0, Wi-Fi 6"},
+        {"product_name": "Gadget X", "key": "Water Resistance", "value": "IP68"},
+    ]
+    with conn.cursor() as cur:
+        for s in specs:
+            product_id = products.get(s["product_name"])
+            if not product_id:
+                continue
+            cur.execute(
+                "SELECT COUNT(*) FROM product_specifications WHERE product_id = %s AND key = %s",
+                (product_id, s["key"]),
+            )
+            if cur.fetchone()[0] > 0:
+                continue
+            cur.execute(
+                "INSERT INTO product_specifications (product_id, key, value) VALUES (%s, %s, %s)",
+                (product_id, s["key"], s["value"]),
+            )
+    conn.commit()
+
+
+def _seed_warranties(conn, products: dict[str, str]) -> None:
+    warranties = [
+        {"product_name": "Widget Pro", "duration_months": 12, "terms": "Covers defects in materials and workmanship. Does not cover misuse or unauthorized modifications."},
+        {"product_name": "Gadget X", "duration_months": 24, "terms": "Covers manufacturing defects and battery degradation beyond 20% capacity. Water damage not covered."},
+        {"product_name": "Premium Support Add-on", "duration_months": 0, "terms": "Service add-on — no separate warranty. Coverage tied to active subscription period."},
+    ]
+    with conn.cursor() as cur:
+        for w in warranties:
+            product_id = products.get(w["product_name"])
+            if not product_id:
+                continue
+            cur.execute(
+                "SELECT COUNT(*) FROM product_warranties WHERE product_id = %s",
+                (product_id,),
+            )
+            if cur.fetchone()[0] > 0:
+                continue
+            cur.execute(
+                "INSERT INTO product_warranties (product_id, duration_months, terms) VALUES (%s, %s, %s)",
+                (product_id, w["duration_months"], w["terms"]),
+            )
+    conn.commit()
+
+
+def _seed_inventory(conn, products: dict[str, str]) -> None:
+    inventory = [
+        {"product_name": "Widget Pro", "stock_count": 150, "low_stock": 20},
+        {"product_name": "Gadget X", "stock_count": 8, "low_stock": 15},
+        {"product_name": "Premium Support Add-on", "stock_count": 9999, "low_stock": 100},
+    ]
+    with conn.cursor() as cur:
+        for i in inventory:
+            product_id = products.get(i["product_name"])
+            if not product_id:
+                continue
+            cur.execute(
+                "SELECT COUNT(*) FROM inventory WHERE product_id = %s",
+                (product_id,),
+            )
+            if cur.fetchone()[0] > 0:
+                continue
+            cur.execute(
+                "INSERT INTO inventory (product_id, stock_count, low_stock) VALUES (%s, %s, %s)",
+                (product_id, i["stock_count"], i["low_stock"]),
+            )
+    conn.commit()
+
+
 def seed() -> None:
     print("Running migrations...")
     migrate(DATABASE_URL)
@@ -254,6 +407,26 @@ def seed() -> None:
 
         print("Seeding invoices...")
         _seed_invoices(conn, customers)
+        print("  Done.")
+
+        print("Seeding addresses...")
+        _seed_addresses(conn, customers)
+        print("  Done.")
+
+        print("Seeding account metadata...")
+        _seed_account_metadata(conn, customers)
+        print("  Done.")
+
+        print("Seeding product specifications...")
+        _seed_product_specs(conn, products)
+        print("  Done.")
+
+        print("Seeding warranties...")
+        _seed_warranties(conn, products)
+        print("  Done.")
+
+        print("Seeding inventory...")
+        _seed_inventory(conn, products)
         print("  Done.")
     finally:
         conn.close()

@@ -41,6 +41,7 @@ class TestBusinessDataNode:
             conn=mock_conn,
             customer_id="cust-123",
             category="billing",
+            query_text="",
         )
 
     def test_order_category_calls_service(self, mock_conn: MagicMock) -> None:
@@ -62,6 +63,7 @@ class TestBusinessDataNode:
             conn=mock_conn,
             customer_id="cust-456",
             category="order",
+            query_text="",
         )
 
     def test_general_category_skips_db(self, mock_conn: MagicMock) -> None:
@@ -104,6 +106,48 @@ class TestBusinessDataNode:
 
         assert result == {"business_data": {}}
         mock_svc.assert_not_called()
+
+    def test_account_category_calls_service(self, mock_conn: MagicMock) -> None:
+        with patch(
+            "app.graph.nodes.business_data.BusinessDataService.get_business_data",
+        ) as mock_svc:
+            mock_svc.return_value = {
+                "profile": {"name": "Alice", "email": "alice@example.com"},
+                "addresses": [],
+                "account_metadata": {"email_verified": True},
+            }
+            node = BusinessDataNode(conn=mock_conn)
+
+            result = node({
+                "customer_id": "cust-456",
+                "category": "account",
+                "customer_message": "Reset my password",
+            })
+
+        assert "profile" in result["business_data"]
+        mock_svc.assert_called_once_with(
+            conn=mock_conn, customer_id="cust-456", category="account", query_text="Reset my password",
+        )
+
+    def test_product_category_calls_service(self, mock_conn: MagicMock) -> None:
+        with patch(
+            "app.graph.nodes.business_data.BusinessDataService.get_business_data",
+        ) as mock_svc:
+            mock_svc.return_value = {
+                "products": [{"id": "prod-1", "name": "Widget Pro", "stock": 10}],
+            }
+            node = BusinessDataNode(conn=mock_conn)
+
+            result = node({
+                "customer_id": "cust-789",
+                "category": "product",
+                "customer_message": "Widget Pro specs",
+            })
+
+        assert "products" in result["business_data"]
+        mock_svc.assert_called_once_with(
+            conn=mock_conn, customer_id="cust-789", category="product", query_text="Widget Pro specs",
+        )
 
     def test_only_writes_own_field(self, mock_conn: MagicMock) -> None:
         with patch(

@@ -1,7 +1,7 @@
 """
 Node 1 — Intent Classification. Calls the LLM to categorize the
-customer's message as billing / order / general, writing category
-and intent_confidence onto the state.
+customer's message as billing / order / account / product / general,
+writing category and intent_confidence onto the state.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ __all__ = [
     "ClassifyNode",
 ]
 
-CATEGORIES = ["billing", "order", "general"]
+CATEGORIES = ["billing", "order", "account", "product", "general"]
 
 
 class ClassifyNode:

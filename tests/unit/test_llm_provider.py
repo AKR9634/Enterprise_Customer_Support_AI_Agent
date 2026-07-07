@@ -74,7 +74,7 @@ class TestClassify:
             mock_instance.with_structured_output.return_value = structured_mock
 
             client = LLMClient(model="test")
-            label = client.classify("Categorize: I want a refund", ["billing", "general", "order"])
+            label = client.classify("Categorize: I want a refund", ["billing", "order", "account", "product", "general"])
 
         assert label == "billing"
         mock_instance.with_structured_output.assert_called_once()
@@ -90,7 +90,7 @@ class TestClassify:
 
             client = LLMClient(model="test")
             with pytest.raises(LLMClientError, match="not in the permitted set"):
-                client.classify("Categorize this", ["billing", "general", "order"])
+                client.classify("Categorize this", ["billing", "order", "account", "product", "general"])
 
     def test_rate_limit_during_classify(self) -> None:
         mock_response = MagicMock()

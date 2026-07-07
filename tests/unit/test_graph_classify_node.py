@@ -60,3 +60,21 @@ class TestClassifyNode:
         result = node({"customer_message": "What are your hours"})
 
         assert result["category"] == "general"
+
+    def test_classifies_account_intent(self) -> None:
+        mock_llm = MagicMock()
+        mock_llm.classify.return_value = "account"
+        node = ClassifyNode(llm=mock_llm)
+
+        result = node({"customer_message": "Reset my password"})
+
+        assert result["category"] == "account"
+
+    def test_classifies_product_intent(self) -> None:
+        mock_llm = MagicMock()
+        mock_llm.classify.return_value = "product"
+        node = ClassifyNode(llm=mock_llm)
+
+        result = node({"customer_message": "What are the specs"})
+
+        assert result["category"] == "product"
