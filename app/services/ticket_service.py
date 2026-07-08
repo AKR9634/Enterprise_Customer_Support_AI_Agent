@@ -32,10 +32,10 @@ class InvalidTicketTransition(Exception):
 
 
 _ALLOWED_TRANSITIONS: dict[str, set[str]] = {
-    "open": {"pending"},
+    "open": {"pending", "escalated"},
     "pending": {"resolved", "escalated"},
     "resolved": {"closed"},
-    "escalated": {"closed"},
+    "escalated": {"pending", "closed"},
     "closed": set(),
 }
 
