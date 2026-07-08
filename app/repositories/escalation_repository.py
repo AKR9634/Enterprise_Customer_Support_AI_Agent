@@ -126,3 +126,18 @@ class EscalationRepository:
             if row is None:
                 return None
             return _row_to_escalation(row)
+
+    @staticmethod
+    def claim_atomic(conn: Connection, escalation_id: str, reviewer_id: str) -> Optional[Escalation]:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE escalations "
+                "SET status = 'in_review', assigned_reviewer = %s, updated_at = now() "
+                "WHERE id = %s AND status = 'queued' AND assigned_reviewer IS NULL "
+                "RETURNING *",
+                (reviewer_id, escalation_id),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return None
+            return _row_to_escalation(row)

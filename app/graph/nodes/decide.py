@@ -46,6 +46,9 @@ class DecideNode:
             "escalation_reason": reason,
         }
 
+        # Persistence (enqueue) happens in the API layer (chat.py),
+        # not here — the graph node only makes the decision.
+
         # ── Structural guarantee: never leak draft_response on escalation ─
         if escalate:
             result["final_response"] = config.ESCALATION_ACKNOWLEDGMENT

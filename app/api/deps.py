@@ -54,6 +54,16 @@ def get_escalation_repo() -> EscalationRepository:
 EscalationRepoDep = Annotated[EscalationRepository, Depends(get_escalation_repo)]
 
 
+from app.services.escalation_service import EscalationService
+
+
+def get_escalation_service() -> EscalationService:
+    return EscalationService()
+
+
+EscalationServiceDep = Annotated[EscalationService, Depends(get_escalation_service)]
+
+
 # ── LLM deps ──────────────────────────────────────────────────────────────
 
 from app.llm.provider import LLMClient
