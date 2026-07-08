@@ -6,11 +6,34 @@ escalation through its lifecycle in the human review queue.
 
 from __future__ import annotations
 
+from typing import Any, Optional
+
+import structlog
+from psycopg import Connection
+
 from app import config
+from app.repositories.escalation_repository import EscalationRepository
+from app.services.ticket_service import TicketService
+
+logger = structlog.get_logger(__name__)
 
 __all__ = [
+    "EscalationConflictError",
     "EscalationService",
 ]
+
+
+class EscalationConflictError(Exception):
+    """Raised when an escalation cannot be claimed because it is
+    already claimed or not found."""
+
+    def __init__(self, escalation_id: str, agent_id: str) -> None:
+        self.escalation_id = escalation_id
+        self.agent_id = agent_id
+        super().__init__(
+            f"Escalation {escalation_id} already claimed or not found "
+            f"(agent {agent_id})"
+        )
 
 
 class EscalationService:
@@ -38,13 +61,74 @@ class EscalationService:
 
         return False, None
 
-    # ── Lifecycle stubs (Phase 5) ──────────────────────────────────────────
+    # ── Lifecycle (Phase 5) ────────────────────────────────────────────────
 
-    def enqueue(self, escalation_id: str) -> None:
-        """Add an escalation to the human review queue."""
+    def enqueue(
+        self,
+        conn: Connection,
+        ticket_id: str,
+        escalation_reason: str,
+        category: Optional[str] = None,
+        confidence: Optional[float] = None,
+        customer_message: Optional[str] = None,
+        draft_response: Optional[str] = None,
+        routing_reason: Optional[str] = None,
+        retrieved_docs: Optional[list[dict[str, Any]]] = None,
+        business_data: Optional[dict[str, Any]] = None,
+        priority: str = "normal",
+    ) -> Any:
+        """Persist an escalation record and transition the ticket to escalated."""
+        escalation = EscalationRepository.create(
+            conn,
+            ticket_id=ticket_id,
+            escalation_reason=escalation_reason,
+            category=category,
+            confidence=confidence,
+            customer_message=customer_message,
+            draft_response=draft_response,
+            routing_reason=routing_reason,
+            retrieved_docs=retrieved_docs,
+            business_data=business_data,
+            priority=priority,
+        )
 
-    def claim(self, escalation_id: str, agent_id: str) -> None:
-        """Assign an escalation to a human agent."""
+        TicketService.transition_status(conn, ticket_id, "escalated")
 
-    def resolve(self, escalation_id: str) -> None:
-        """Mark an escalation as resolved."""
+        logger.info("escalation_enqueued", escalation_id=str(escalation.id), ticket_id=ticket_id)
+        return escalation
+
+    def claim(self, conn: Connection, escalation_id: str, agent_id: str) -> Any:
+        """Atomically claim an escalation; raises EscalationConflictError if not available."""
+        escalation = EscalationRepository.claim_atomic(conn, escalation_id, agent_id)
+        if escalation is None:
+            logger.warning(
+                "escalation_claim_conflict",
+                escalation_id=escalation_id,
+                agent_id=agent_id,
+            )
+            raise EscalationConflictError(escalation_id, agent_id)
+
+        TicketService.transition_status(conn, str(escalation.ticket_id), "pending")
+
+        logger.info(
+            "escalation_claimed",
+            escalation_id=escalation_id,
+            agent_id=agent_id,
+            ticket_id=str(escalation.ticket_id),
+        )
+        return escalation
+
+    def resolve(self, conn: Connection, escalation_id: str) -> Any:
+        """Mark an escalation as resolved and transition the parent ticket."""
+        escalation = EscalationRepository.update_status(conn, escalation_id, "resolved")
+        if escalation is None:
+            raise ValueError(f"Escalation {escalation_id} not found")
+
+        TicketService.transition_status(conn, str(escalation.ticket_id), "resolved")
+
+        logger.info(
+            "escalation_resolved",
+            escalation_id=escalation_id,
+            ticket_id=str(escalation.ticket_id),
+        )
+        return escalation

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from psycopg import Connection
 
 from app.api.auth import check_ownership, get_current_user
-from app.api.deps import DbDep, LlmClientDep, TicketServiceDep
+from app.api.deps import DbDep, EscalationServiceDep, LlmClientDep, TicketServiceDep
 from app.api.schemas import ChatRequest, ChatResponse
 from app.graph.state import SupportState
 from app.graph.workflow import run_graph
@@ -22,6 +22,7 @@ def send_message(
     current_user: Annotated[dict, Depends(get_current_user)],
     llm: LlmClientDep,
     ticket_service: TicketServiceDep,
+    escalation_service: EscalationServiceDep,
 ):
     ticket_id = body.ticket_id
     if ticket_id:
@@ -53,6 +54,20 @@ def send_message(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"AI service unavailable: {e}",
+        )
+
+    if result["escalate"]:
+        escalation_service.enqueue(
+            db,
+            ticket_id=ticket_id,
+            escalation_reason=result["escalation_reason"],
+            category=result.get("category"),
+            confidence=result.get("confidence"),
+            customer_message=body.message,
+            draft_response=result.get("draft_response"),
+            routing_reason=result.get("routing_reason"),
+            retrieved_docs=result.get("retrieved_docs"),
+            business_data=result.get("business_data"),
         )
 
     ConversationRepository.append_message(
