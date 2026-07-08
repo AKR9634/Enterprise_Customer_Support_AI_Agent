@@ -197,3 +197,43 @@ class ProductDetailOut(BaseModel):
     specifications: list[ProductSpecOut] = []
     warranty: ProductWarrantyOut | None = None
     inventory: InventoryOut | None = None
+
+
+# ── Escalations ──────────────────────────────────────────────────────────────
+
+class EscalationOut(BaseModel):
+    id: str
+    ticket_id: str
+    status: str
+    priority: str
+    assigned_reviewer: str | None = None
+    escalation_reason: str
+    category: str | None = None
+    confidence: float | None = None
+    customer_message: str | None = None
+    draft_response: str | None = None
+    routing_reason: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class EscalationDetailOut(EscalationOut):
+    retrieved_docs: list[dict] = []
+    business_data: dict = {}
+
+
+class EscalationListResponse(BaseModel):
+    escalations: list[EscalationOut]
+
+
+class EscalationContextOut(BaseModel):
+    escalation_id: str
+    ticket_id: str
+    customer_message: str | None = None
+    draft_response: str | None = None
+    routing_reason: str | None = None
+    escalation_reason: str
+    category: str | None = None
+    confidence: float | None = None
+    retrieved_docs: list[dict] = []
+    business_data: dict = {}

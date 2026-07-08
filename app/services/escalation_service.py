@@ -132,3 +132,16 @@ class EscalationService:
             ticket_id=str(escalation.ticket_id),
         )
         return escalation
+
+    def list_queued(self, conn: Connection) -> list[Any]:
+        """Return all queued escalations sorted by priority then oldest-first."""
+        escalations = EscalationRepository.list_queued(conn)
+        logger.info("escalations_listed", count=len(escalations))
+        return escalations
+
+    def get_by_id(self, conn: Connection, escalation_id: str) -> Optional[Any]:
+        """Return a single escalation by ID, or None if not found."""
+        escalation = EscalationRepository.get_by_id(conn, escalation_id)
+        if escalation is None:
+            logger.warning("escalation_not_found", escalation_id=escalation_id)
+        return escalation
