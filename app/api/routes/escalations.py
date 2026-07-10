@@ -11,10 +11,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.api.auth import require_role
 from app.api.deps import DbDep, EscalationServiceDep
 from app.api.schemas import (
+    AgentReplyRequest,
+    AgentReplyResponse,
     EscalationContextOut,
     EscalationListResponse,
     EscalationOut,
 )
+from app.repositories.conversation_repository import ConversationRepository
 from app.services.escalation_service import EscalationConflictError
 
 router = APIRouter(prefix="/escalations", tags=["escalations"])
@@ -95,6 +98,33 @@ def resolve_escalation(
         )
     db.commit()
     return _escalation_to_out(escalation)
+
+
+@router.post("/{escalation_id}/reply", response_model=AgentReplyResponse)
+def agent_reply(
+    escalation_id: str,
+    body: AgentReplyRequest,
+    db: DbDep,
+    agent: AgentDep,
+    svc: EscalationServiceDep,
+):
+    escalation = svc.get_by_id(db, escalation_id)
+    if escalation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Escalation not found",
+        )
+
+    ConversationRepository.append_message(
+        db, str(escalation.ticket_id), "agent", body.message,
+    )
+    svc.resolve(db, escalation_id)
+    db.commit()
+    return AgentReplyResponse(
+        escalation_id=escalation_id,
+        ticket_id=str(escalation.ticket_id),
+        status="resolved",
+    )
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────

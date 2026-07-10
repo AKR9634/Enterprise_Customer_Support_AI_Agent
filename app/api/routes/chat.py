@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -12,6 +13,7 @@ from app.llm.provider import LLMClientError
 from app.repositories.conversation_repository import ConversationRepository
 from app.services.ticket_service import TicketService
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
@@ -54,6 +56,13 @@ def send_message(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"AI service unavailable: {e}",
+        )
+    except Exception as e:
+        db.rollback()
+        logger.exception("Graph execution failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process message: {e}",
         )
 
     if result["escalate"]:

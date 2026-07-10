@@ -226,6 +226,16 @@ class EscalationListResponse(BaseModel):
     escalations: list[EscalationOut]
 
 
+class AgentReplyRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+
+
+class AgentReplyResponse(BaseModel):
+    escalation_id: str
+    ticket_id: str
+    status: str
+
+
 class EscalationContextOut(BaseModel):
     escalation_id: str
     ticket_id: str

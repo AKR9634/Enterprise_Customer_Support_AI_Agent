@@ -12,8 +12,8 @@ interface User {
 interface AuthContextType {
   token: string | null;
   user: User | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, fullName: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
+  register: (email: string, fullName: string, password: string) => Promise<User>;
   logout: () => void;
 }
 
@@ -27,7 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem("access_token");
     if (saved) {
       setToken(saved);
-      fetch("/auth/me", {
+      fetch("http://localhost:8000/auth/me", {
         headers: { Authorization: `Bearer ${saved}` },
       })
         .then((res) => {
@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function login(email: string, password: string) {
-    const res = await fetch("/auth/login", {
+    const res = await fetch("http://localhost:8000/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -53,17 +53,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("access_token", data.access_token);
     setToken(data.access_token);
 
-    const meRes = await fetch("/auth/me", {
+    const meRes = await fetch("http://localhost:8000/auth/me", {
       headers: { Authorization: `Bearer ${data.access_token}` },
     });
-    if (meRes.ok) {
-      const me = await meRes.json();
-      setUser(me);
-    }
+    if (!meRes.ok) throw new Error("Failed to fetch user");
+    const me = await meRes.json();
+    setUser(me);
+    return me;
   }
 
   async function register(email: string, fullName: string, password: string) {
-    const res = await fetch("/auth/register", {
+    const res = await fetch("http://localhost:8000/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, full_name: fullName, password }),
@@ -76,13 +76,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("access_token", data.access_token);
     setToken(data.access_token);
 
-    const meRes = await fetch("/auth/me", {
+    const meRes = await fetch("http://localhost:8000/auth/me", {
       headers: { Authorization: `Bearer ${data.access_token}` },
     });
-    if (meRes.ok) {
-      const me = await meRes.json();
-      setUser(me);
-    }
+    if (!meRes.ok) throw new Error("Failed to fetch user");
+    const me = await meRes.json();
+    setUser(me);
+    return me;
   }
 
   function logout() {
