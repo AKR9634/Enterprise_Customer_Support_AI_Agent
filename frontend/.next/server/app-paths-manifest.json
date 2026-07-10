@@ -1,0 +1,5 @@
+{
+  "/agent/page": "app/agent/page.js",
+  "/auth/login/page": "app/auth/login/page.js",
+  "/chat/page": "app/chat/page.js"
+}

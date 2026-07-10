@@ -15,8 +15,8 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     try {
-      await login(email, password);
-      router.push("/chat");
+      const user = await login(email, password);
+      router.push(user.role === "agent" ? "/agent" : "/chat");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
     }

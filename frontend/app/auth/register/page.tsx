@@ -16,8 +16,8 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
     try {
-      await register(email, fullName, password);
-      router.push("/chat");
+      const user = await register(email, fullName, password);
+      router.push(user.role === "agent" ? "/agent" : "/chat");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Registration failed");
     }
