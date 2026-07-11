@@ -6,6 +6,9 @@ import { useAuth } from "../../components/AuthContext";
 import AgentQueueList from "../../components/AgentQueueList";
 import AgentContextPanel from "../../components/AgentContextPanel";
 import AgentReplyForm from "../../components/AgentReplyForm";
+import { AgentStatusToggle } from "../../components/agent/AgentStatusToggle";
+import { Button } from "../../components/ui/Button";
+import { IconHeadset } from "@tabler/icons-react";
 
 interface EscalationItem {
   id: string;
@@ -62,7 +65,6 @@ export default function AgentPage() {
         setQueue(data.escalations || []);
       }
     } catch {
-      // silently fail — queue stays empty
     } finally {
       setQueueLoading(false);
     }
@@ -97,7 +99,7 @@ export default function AgentPage() {
     }
   }
 
-  function handleBack() {
+  function handleSent() {
     setSelectedId(null);
     setContext(null);
     fetchQueue();
@@ -108,80 +110,60 @@ export default function AgentPage() {
   }
 
   return (
-    <main style={{ maxWidth: 960, margin: "0 auto", padding: "24px 16px" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 24,
-        }}
-      >
-        <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>Agent Dashboard</h1>
-          <p style={{ margin: "4px 0 0", fontSize: 14, color: "#6b7280" }}>
-            {user.full_name} · {user.email}
-          </p>
-        </div>
-        <button
-          onClick={() => router.push("/auth/login")}
-          style={{
-            padding: "8px 16px",
-            fontSize: 13,
-            border: "1px solid #d1d5db",
-            borderRadius: 6,
-            background: "#fff",
-            cursor: "pointer",
-          }}
-        >
-          Sign out
-        </button>
-      </div>
-
-      {selectedId && context ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+    <div className="flex flex-col h-screen bg-support-surface">
+      <header className="flex items-center justify-between px-6 py-3 border-b border-support-border bg-white shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-support-primary">
+            <IconHeadset size={20} className="text-white" />
+          </div>
           <div>
-            <button
-              onClick={handleBack}
-              style={{
-                padding: "6px 12px",
-                fontSize: 13,
-                border: "1px solid #d1d5db",
-                borderRadius: 6,
-                background: "#fff",
-                cursor: "pointer",
-                marginBottom: 16,
-              }}
-            >
-              ← Back to queue
-            </button>
-            <AgentContextPanel escalation={context} loading={false} />
-          </div>
-          <div
-            style={{
-              borderTop: "1px solid #e5e7eb",
-              paddingTop: 20,
-            }}
-          >
-            <h2
-              style={{
-                margin: "0 0 12px",
-                fontSize: 16,
-                fontWeight: 600,
-              }}
-            >
-              Manual Reply
-            </h2>
-            <AgentReplyForm escalationId={selectedId} onSent={handleBack} />
+            <h1 className="m-0 text-base font-bold text-support-text">Agent Dashboard</h1>
+            <p className="m-0 text-xs text-support-text-muted">
+              {user.full_name} · {user.email}
+            </p>
           </div>
         </div>
-      ) : (
-        <AgentQueueList
-          escalations={queue}
-          onClaim={handleClaim}
-          loading={queueLoading || claimLoading}
-        />
-      )}
-    </main>
+        <div className="flex items-center gap-3">
+          <AgentStatusToggle />
+          <Button variant="ghost" size="sm" onClick={() => router.push("/auth/login")}>
+            Sign out
+          </Button>
+        </div>
+      </header>
+
+      <div className="flex flex-1 overflow-hidden">
+        <aside className="w-[380px] shrink-0 border-r border-support-border bg-white overflow-y-auto p-4">
+          <AgentQueueList
+            escalations={queue}
+            onClaim={handleClaim}
+            loading={queueLoading}
+          />
+        </aside>
+
+        <main className="flex-1 overflow-y-auto p-6">
+          {selectedId && context ? (
+            <div className="max-w-3xl mx-auto space-y-6">
+              <AgentContextPanel escalation={context} loading={false} />
+              <div className="border-t border-support-border pt-6">
+                <h2 className="m-0 mb-3 text-sm font-semibold text-support-text">
+                  Manual Reply
+                </h2>
+                <AgentReplyForm escalationId={selectedId} onSent={handleSent} />
+              </div>
+            </div>
+          ) : selectedId ? (
+            <div className="max-w-3xl mx-auto">
+              <AgentContextPanel escalation={null} loading={true} />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center px-4">
+              <p className="text-sm text-support-text-faint">
+                Claim an escalation from the queue to review customer context and reply.
+              </p>
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
   );
 }

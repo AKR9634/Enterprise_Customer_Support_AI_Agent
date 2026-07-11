@@ -1,5 +1,9 @@
 "use client";
 
+import { Badge } from "./ui/Badge";
+import { Card } from "./ui/Card";
+import { Skeleton } from "./ui/Skeleton";
+
 interface ContextEscalation {
   escalation_id: string;
   ticket_id: string;
@@ -18,19 +22,18 @@ interface Props {
   loading: boolean;
 }
 
+const CATEGORY_BADGE: Record<string, "warning" | "info" | "default" | "success"> = {
+  billing: "warning",
+  order: "info",
+  account: "default",
+  product: "success",
+  general: "default",
+};
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 20 }}>
-      <h3
-        style={{
-          margin: "0 0 6px",
-          fontSize: 13,
-          fontWeight: 600,
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          color: "#6b7280",
-        }}
-      >
+    <div className="mb-4">
+      <h3 className="m-0 mb-1.5 text-xs font-semibold uppercase tracking-wider text-support-text-muted">
         {title}
       </h3>
       {children}
@@ -38,132 +41,131 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2 text-sm text-support-text">
+      <span className="text-support-text-muted">{label}:</span>
+      <span className="font-medium">{value}</span>
+    </div>
+  );
+}
+
+function StructuredData({ data }: { data: Record<string, unknown> }) {
+  const entries = Object.entries(data);
+  if (entries.length === 0) return <span className="text-sm text-support-text-faint">No data</span>;
+
+  return (
+    <div className="space-y-1.5">
+      {entries.map(([key, value]) => (
+        <div key={key} className="flex gap-2 text-sm">
+          <span className="text-support-text-muted font-medium shrink-0 min-w-[120px]">
+            {key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}:
+          </span>
+          <span className="text-support-text">
+            {typeof value === "object" && value !== null
+              ? JSON.stringify(value)
+              : String(value)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function AgentContextPanel({ escalation, loading }: Props) {
   if (loading) {
     return (
-      <div style={{ padding: 24, color: "#6b7280" }}>
-        Loading escalation context…
+      <div className="space-y-4">
+        <Skeleton variant="rectangular" className="w-full h-20" />
+        <Skeleton variant="rectangular" className="w-full h-16" />
+        <Skeleton variant="rectangular" className="w-full h-24" />
       </div>
     );
   }
 
   if (!escalation) {
     return (
-      <div
-        style={{
-          padding: 24,
-          color: "#9ca3af",
-          textAlign: "center",
-          border: "2px dashed #e5e7eb",
-          borderRadius: 8,
-        }}
-      >
-        Claim an escalation to view its context.
+      <div className="flex items-center justify-center h-full">
+        <p className="text-sm text-support-text-faint text-center px-4">
+          Claim an escalation from the queue to view customer context, AI draft, and business data.
+        </p>
       </div>
     );
   }
 
+  const categoryVariant = CATEGORY_BADGE[escalation.category ?? ""] ?? "default";
+
   const confidenceColor =
     escalation.confidence == null
-      ? "#dc2626"
+      ? "text-support-danger"
       : escalation.confidence >= 0.8
-        ? "#16a34a"
+        ? "text-support-success"
         : escalation.confidence >= 0.5
-          ? "#d97706"
-          : "#dc2626";
+          ? "text-support-warning"
+          : "text-support-danger";
 
   return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          gap: 12,
-          fontSize: 12,
-          color: "#6b7280",
-          marginBottom: 24,
-        }}
-      >
-        <span>Ticket: <strong>{escalation.ticket_id}</strong></span>
-        <span>|</span>
-        <span>
-          Confidence:{" "}
-          <strong style={{ color: confidenceColor }}>
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 flex-wrap text-sm">
+        <InfoRow label="Ticket" value={escalation.ticket_id} />
+        <span className="text-support-border-strong">|</span>
+        <div className="flex items-center gap-1">
+          <span className="text-support-text-muted">Confidence:</span>
+          <span className={`font-medium ${confidenceColor}`}>
             {escalation.confidence != null
               ? `${(escalation.confidence * 100).toFixed(0)}%`
               : "N/A"}
-          </strong>
-        </span>
-        <span>|</span>
-        <span>Category: <strong>{escalation.category || "—"}</strong></span>
+          </span>
+        </div>
+        <span className="text-support-border-strong">|</span>
+        <Badge variant={categoryVariant}>{escalation.category || "uncategorized"}</Badge>
       </div>
 
       <Section title="Customer message">
-        <div
-          style={{
-            background: "#f9fafb",
-            borderRadius: 6,
-            padding: 12,
-            fontSize: 14,
-            lineHeight: 1.5,
-            whiteSpace: "pre-wrap",
-          }}
-        >
-          {escalation.customer_message || "(empty)"}
-        </div>
+        <Card padding="sm">
+          <p className="m-0 text-sm text-support-text whitespace-pre-wrap leading-relaxed">
+            {escalation.customer_message || (
+              <span className="text-support-text-faint italic">(empty)</span>
+            )}
+          </p>
+        </Card>
       </Section>
 
       <Section title="Draft AI response">
-        <div
-          style={{
-            background: "#f9fafb",
-            borderRadius: 6,
-            padding: 12,
-            fontSize: 14,
-            lineHeight: 1.5,
-            whiteSpace: "pre-wrap",
-          }}
-        >
-          {escalation.draft_response || "(empty)"}
-        </div>
+        <Card padding="sm" className="bg-support-surface border-support-border">
+          <p className="m-0 text-sm text-support-text whitespace-pre-wrap leading-relaxed">
+            {escalation.draft_response || (
+              <span className="text-support-text-faint italic">(empty)</span>
+            )}
+          </p>
+        </Card>
       </Section>
 
       <Section title="Escalation reason">
-        <div
-          style={{
-            background: "#fef2f2",
-            borderRadius: 6,
-            padding: 12,
-            fontSize: 14,
-            color: "#991b1b",
-          }}
-        >
-          {escalation.escalation_reason}
-        </div>
+        <Card padding="sm" className="bg-support-danger-bg border-support-danger/20">
+          <p className="m-0 text-sm text-support-danger-text">
+            {escalation.escalation_reason}
+          </p>
+        </Card>
       </Section>
 
       <Section title="Routing reason">
-        <div style={{ fontSize: 14, color: "#374151" }}>
-          {escalation.routing_reason || "(not recorded)"}
-        </div>
+        <p className="m-0 text-sm text-support-text">
+          {escalation.routing_reason || (
+            <span className="text-support-text-faint italic">(not recorded)</span>
+          )}
+        </p>
       </Section>
 
       {escalation.retrieved_docs.length > 0 && (
         <Section title="Retrieved documents">
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div className="space-y-2">
             {escalation.retrieved_docs.map((doc, i) => (
-              <div
-                key={i}
-                style={{
-                  background: "#f3f4f6",
-                  borderRadius: 6,
-                  padding: "8px 12px",
-                  fontSize: 13,
-                }}
-              >
-                <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
+              <Card key={i} padding="sm" className="bg-support-surface-alt">
+                <pre className="m-0 text-xs text-support-text whitespace-pre-wrap font-sans leading-relaxed">
                   {JSON.stringify(doc, null, 2)}
                 </pre>
-              </div>
+              </Card>
             ))}
           </div>
         </Section>
@@ -171,18 +173,9 @@ export default function AgentContextPanel({ escalation, loading }: Props) {
 
       {Object.keys(escalation.business_data).length > 0 && (
         <Section title="Business data">
-          <div
-            style={{
-              background: "#f3f4f6",
-              borderRadius: 6,
-              padding: 12,
-              fontSize: 13,
-            }}
-          >
-            <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
-              {JSON.stringify(escalation.business_data, null, 2)}
-            </pre>
-          </div>
+          <Card padding="sm" className="bg-support-surface-alt">
+            <StructuredData data={escalation.business_data} />
+          </Card>
         </Section>
       )}
     </div>
