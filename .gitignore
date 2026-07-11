@@ -168,3 +168,40 @@ specs
 Frontend_Roadmap.md
 
 frontend/.next/
+
+
+
+# Python
+.python-version
+__pypackages__/
+
+# Next.js
+frontend/out/
+frontend/.turbo/
+frontend/.vercel/
+frontend/.swc/
+
+# AI
+chroma_db/
+.faiss/
+wandb/
+mlruns/
+runs/
+
+# Package Managers
+.pnpm-store/
+.npm/
+.yarn/
+
+# AI IDEs
+.cursor/
+.claude/
+.aider*
+.continue/
+
+# Misc
+.cache/
+*.pid
+*.seed
+*.orig
+*.rej
