@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { Button } from "./ui/Button";
 
 interface Props {
   escalationId: string;
@@ -45,42 +46,25 @@ export default function AgentReplyForm({ escalationId, onSent }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <textarea
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         placeholder="Type your reply…"
         rows={4}
         disabled={sending}
-        style={{
-          width: "100%",
-          padding: "10px 12px",
-          fontSize: 14,
-          borderRadius: 6,
-          border: "1px solid #d1d5db",
-          resize: "vertical",
-          fontFamily: "inherit",
-          boxSizing: "border-box",
-        }}
+        className="w-full px-3.5 py-2.5 text-sm border border-support-border-strong rounded-md outline-none transition-colors placeholder:text-support-text-faint focus:border-support-primary resize-vertical font-sans box-border disabled:opacity-50 disabled:cursor-not-allowed"
       />
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <button
+      <div className="flex items-center gap-3">
+        <Button
           type="submit"
+          variant="primary"
+          size="md"
           disabled={sending || !message.trim()}
-          style={{
-            padding: "8px 24px",
-            fontSize: 14,
-            fontWeight: 600,
-            border: "none",
-            borderRadius: 6,
-            cursor: sending || !message.trim() ? "not-allowed" : "pointer",
-            background: sending || !message.trim() ? "#e5e7eb" : "#16a34a",
-            color: sending || !message.trim() ? "#9ca3af" : "#fff",
-          }}
         >
           {sending ? "Sending…" : "Send Reply"}
-        </button>
-        {error && <span style={{ fontSize: 13, color: "#dc2626" }}>{error}</span>}
+        </Button>
+        {error && <span className="text-xs text-support-danger">{error}</span>}
       </div>
     </form>
   );

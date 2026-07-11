@@ -3,7 +3,6 @@
 import type { TicketStatus } from "../ui/StatusPill";
 import { StatusPill } from "../ui/StatusPill";
 import { Badge } from "../ui/Badge";
-import { Card } from "../ui/Card";
 
 const CATEGORY_BADGES: Record<string, "info" | "success" | "warning" | "danger" | "default"> = {
   billing: "warning",
@@ -29,12 +28,14 @@ export function TicketHistoryCard({ ticket, onClick, isSelected }: TicketHistory
   const badgeVariant = CATEGORY_BADGES[ticket.category ?? ""] ?? "default";
 
   return (
-    <Card
-      padding="md"
-      className={`cursor-pointer transition-colors hover:border-support-primary ${
+    <div
+      onClick={() => onClick(ticket.id)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick(ticket.id); }}
+      className={`border border-support-border rounded-lg bg-white p-4 cursor-pointer transition-colors hover:border-support-primary ${
         isSelected ? "border-support-primary ring-1 ring-support-primary" : ""
       }`}
-      onClick={() => onClick(ticket.id)}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -58,6 +59,6 @@ export function TicketHistoryCard({ ticket, onClick, isSelected }: TicketHistory
           <StatusPill status={ticket.status} />
         </div>
       </div>
-    </Card>
+    </div>
   );
 }

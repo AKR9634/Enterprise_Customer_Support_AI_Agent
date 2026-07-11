@@ -1,17 +1,9 @@
 "use client";
 
-const PRIORITY_COLORS: Record<string, string> = {
-  urgent: "#dc2626",
-  high: "#ea580c",
-  normal: "#2563eb",
-  low: "#6b7280",
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  queued: "#d97706",
-  in_review: "#2563eb",
-  resolved: "#16a34a",
-};
+import { QueueRow } from "./agent/QueueRow";
+import { Skeleton } from "./ui/Skeleton";
+import { EmptyState } from "./ui/EmptyState";
+import { IconInbox } from "@tabler/icons-react";
 
 interface EscalationItem {
   id: string;
@@ -33,105 +25,36 @@ interface Props {
 
 export default function AgentQueueList({ escalations, onClaim, loading }: Props) {
   if (loading) {
-    return <div style={{ padding: 24, color: "#6b7280" }}>Loading queue…</div>;
-  }
-
-  if (escalations.length === 0) {
     return (
-      <div style={{ padding: 24, color: "#6b7280", textAlign: "center" }}>
-        No escalations in the queue.
+      <div className="space-y-3">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="border border-support-border rounded-lg p-4 bg-white">
+            <div className="flex gap-2 mb-2">
+              <Skeleton variant="text" className="w-16 h-5" />
+              <Skeleton variant="text" className="w-20 h-5" />
+            </div>
+            <Skeleton variant="text" className="w-full h-4 mb-1" />
+            <Skeleton variant="text" className="w-1/3 h-4" />
+          </div>
+        ))}
       </div>
     );
   }
 
+  if (escalations.length === 0) {
+    return (
+      <EmptyState
+        icon={<IconInbox size={40} />}
+        title="Queue is empty"
+        description="No escalations in the queue right now. Check back later."
+      />
+    );
+  }
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <div className="space-y-2">
       {escalations.map((esc) => (
-        <div
-          key={esc.id}
-          style={{
-            border: "1px solid #e5e7eb",
-            borderRadius: 8,
-            padding: "12px 16px",
-            background: "#fff",
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                textTransform: "uppercase",
-                color: "#fff",
-                background: PRIORITY_COLORS[esc.priority] || "#6b7280",
-                padding: "2px 8px",
-                borderRadius: 4,
-              }}
-            >
-              {esc.priority}
-            </span>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: STATUS_COLORS[esc.status] || "#6b7280",
-              }}
-            >
-              {esc.status}
-            </span>
-            {esc.category && (
-              <span
-                style={{
-                  fontSize: 11,
-                  background: "#f3f4f6",
-                  padding: "2px 8px",
-                  borderRadius: 4,
-                  color: "#374151",
-                }}
-              >
-                {esc.category}
-              </span>
-            )}
-            <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: "auto" }}>
-              {esc.confidence != null ? `${(esc.confidence * 100).toFixed(0)}% confidence` : "—"}
-            </span>
-          </div>
-
-          <p
-            style={{
-              margin: 0,
-              fontSize: 14,
-              color: "#374151",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {esc.customer_message || esc.escalation_reason}
-          </p>
-
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button
-              onClick={() => onClaim(esc.id)}
-              disabled={esc.status !== "queued"}
-              style={{
-                padding: "6px 16px",
-                fontSize: 13,
-                fontWeight: 600,
-                border: "none",
-                borderRadius: 6,
-                cursor: esc.status === "queued" ? "pointer" : "not-allowed",
-                background: esc.status === "queued" ? "#2563eb" : "#e5e7eb",
-                color: esc.status === "queued" ? "#fff" : "#9ca3af",
-              }}
-            >
-              Claim
-            </button>
-          </div>
-        </div>
+        <QueueRow key={esc.id} escalation={esc} onClaim={onClaim} />
       ))}
     </div>
   );
