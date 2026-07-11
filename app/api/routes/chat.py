@@ -85,9 +85,17 @@ def send_message(
 
     db.commit()
 
+    retrieved = result.get("retrieved_docs") or []
+    citations = sorted({d.get("title", "") for d in retrieved if d.get("title")})
+
+    ticket = ticket_service.get_ticket(db, ticket_id)
+    ticket_status = ticket.status if ticket else "unknown"
+
     return ChatResponse(
         ticket_id=ticket_id,
         response=result["final_response"],
         escalated=result["escalate"],
         escalation_reason=result.get("escalation_reason"),
+        citations=citations,
+        ticket_status=ticket_status,
     )

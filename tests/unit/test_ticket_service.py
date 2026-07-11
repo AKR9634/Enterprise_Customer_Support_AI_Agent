@@ -10,10 +10,10 @@ from app.services.ticket_service import InvalidTicketTransition, TicketService
 _ALL_STATUSES = ["open", "pending", "resolved", "escalated", "closed"]
 
 _LEGAL: dict[str, set[str]] = {
-    "open": {"pending"},
+    "open": {"pending", "escalated"},
     "pending": {"resolved", "escalated"},
     "resolved": {"closed"},
-    "escalated": {"closed"},
+    "escalated": {"pending", "closed"},
     "closed": set(),
 }
 
