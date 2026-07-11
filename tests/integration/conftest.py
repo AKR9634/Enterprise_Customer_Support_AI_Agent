@@ -7,14 +7,14 @@ from collections.abc import Generator
 import pytest
 from psycopg import Connection
 
-from app.config import DATABASE_URL
+from app.config import TEST_DATABASE_URL
 from app.db.session import get_connection
 
 
 @pytest.fixture(scope="session")
 def db_url() -> str:
-    assert DATABASE_URL, "DATABASE_URL must be set in .env"
-    return DATABASE_URL
+    assert TEST_DATABASE_URL, "TEST_DATABASE_URL must be set in .env"
+    return TEST_DATABASE_URL
 
 
 @pytest.fixture

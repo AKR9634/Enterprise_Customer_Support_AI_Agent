@@ -7,17 +7,15 @@ import pytest
 from fastapi.testclient import TestClient
 from psycopg import Connection
 
-from app.config import JWT_ALGORITHM, JWT_SECRET
+from app.config import JWT_ALGORITHM, JWT_SECRET, TEST_DATABASE_URL
 from app.db.session import get_connection
 from app.main import app
 from scripts.migrate import migrate
 
-TEST_DB_URL = "postgresql://postgres:postgres@localhost:5432/test_enterprise_support"
-
 
 @pytest.fixture(scope="session")
 def db_url() -> str:
-    return TEST_DB_URL
+    return TEST_DATABASE_URL
 
 
 @pytest.fixture(scope="session")

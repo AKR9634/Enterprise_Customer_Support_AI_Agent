@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+TEST_DATABASE_URL: str = os.getenv("TEST_DATABASE_URL", "")
 
 JWT_SECRET: str = os.getenv("JWT_SECRET", "")
 JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
