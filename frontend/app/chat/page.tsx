@@ -114,6 +114,9 @@ export default function ChatPage() {
             {user.full_name} · {user.email}
           </p>
         </div>
+        <Button variant="ghost" size="sm" onClick={() => router.push("/chat/history")}>
+          History
+        </Button>
         <Button variant="secondary" size="sm" onClick={() => router.push("/auth/login")}>
           Sign out
         </Button>

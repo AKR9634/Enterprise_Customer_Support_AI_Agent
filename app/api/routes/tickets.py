@@ -12,6 +12,7 @@ from app.api.schemas import (
     TicketCreate,
     TicketDetailResponse,
     TicketListResponse,
+    TicketMessagesResponse,
     TicketResponse,
 )
 from app.repositories.conversation_repository import ConversationRepository
@@ -69,6 +70,35 @@ def get_ticket(
                 "created_at": m.created_at,
             }) for m in messages]
         ),
+    )
+
+
+@router.get("/{ticket_id}/messages", response_model=TicketMessagesResponse)
+def get_ticket_messages(
+    ticket_id: str,
+    db: DbDep,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    ticket_service: TicketServiceDep,
+    conversation_repo: ConversationRepoDep,
+):
+    ticket = ticket_service.get_ticket(db, ticket_id)
+    if ticket is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
+    check_ownership(current_user, ticket.customer_id)
+
+    messages = conversation_repo.list_by_ticket(db, ticket_id)
+    return TicketMessagesResponse(
+        ticket_id=ticket_id,
+        messages=[
+            MessageResponse(
+                id=str(m.id),
+                ticket_id=str(m.ticket_id),
+                role=m.role,
+                content=m.content,
+                created_at=m.created_at,
+            )
+            for m in messages
+        ],
     )
 
 

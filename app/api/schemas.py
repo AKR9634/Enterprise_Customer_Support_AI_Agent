@@ -79,6 +79,11 @@ class TicketDetailResponse(BaseModel):
     conversation: ConversationResponse
 
 
+class TicketMessagesResponse(BaseModel):
+    ticket_id: str
+    messages: list[MessageResponse]
+
+
 # ── Chat ─────────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):

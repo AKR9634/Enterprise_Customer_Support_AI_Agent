@@ -8,16 +8,15 @@ from fastapi.testclient import TestClient
 from psycopg import Connection
 
 from app.api.auth import create_access_token, hash_password
+from app.config import TEST_DATABASE_URL
 from app.db.session import get_connection
 from app.main import app
 from scripts.migrate import migrate
 
-TEST_DB_URL = "postgresql://postgres:postgres@localhost:5432/test_enterprise_support"
-
 
 @pytest.fixture(scope="session")
 def db_url() -> str:
-    return TEST_DB_URL
+    return TEST_DATABASE_URL
 
 
 @pytest.fixture(scope="session")
