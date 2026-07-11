@@ -91,6 +91,8 @@ class ChatResponse(BaseModel):
     response: str
     escalated: bool
     escalation_reason: str | None = None
+    citations: list[str] = []
+    ticket_status: str = "open"
 
 
 # -- Business Data (orders, billing) ---------------------------------------

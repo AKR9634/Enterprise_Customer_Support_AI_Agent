@@ -1,12 +1,21 @@
 "use client";
 
-import { useState, useEffect, useRef, type FormEvent } from "react";
+import { useState, useEffect, useRef, useCallback, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../components/AuthContext";
+import { MessageBubble } from "../../components/chat/MessageBubble";
+import { TypingIndicator } from "../../components/chat/TypingIndicator";
+import { EscalationBanner } from "../../components/chat/EscalationBanner";
+import { ChatEmptyState } from "../../components/chat/ChatEmptyState";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
+import type { TicketStatus } from "../../components/ui/StatusPill";
 
 interface Message {
-  role: string;
+  role: "customer" | "ai";
   content: string;
+  citations?: string[];
+  ticketStatus?: TicketStatus;
 }
 
 export default function ChatPage() {
@@ -16,6 +25,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [ticketStatus, setTicketStatus] = useState<TicketStatus | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,6 +35,10 @@ export default function ChatPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const handleSuggestionClick = useCallback((prompt: string) => {
+    setInput(prompt);
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -48,14 +62,14 @@ export default function ChatPage() {
         }),
       });
 
-      const body = await res.text();
       if (!res.ok) {
         let detail = "Request failed";
         try {
-          const parsed = JSON.parse(body);
+          const parsed = await res.json();
           detail = parsed.detail || detail;
         } catch {
-          detail = body || detail;
+          const text = await res.text();
+          detail = text || detail;
         }
         setMessages((prev) => [
           ...prev,
@@ -64,13 +78,25 @@ export default function ChatPage() {
         return;
       }
 
-      const data = JSON.parse(body);
+      const data = await res.json();
       setTicketId(data.ticket_id);
-      setMessages((prev) => [...prev, { role: "ai", content: data.response }]);
+      setTicketStatus(data.ticket_status || null);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "ai",
+          content: data.response,
+          citations: data.citations || [],
+          ticketStatus: data.ticket_status || undefined,
+        },
+      ]);
     } catch (err) {
       setMessages((prev) => [
         ...prev,
-        { role: "ai", content: `Error: ${err instanceof Error ? err.message : "Unable to reach server"}` },
+        {
+          role: "ai",
+          content: `Error: ${err instanceof Error ? err.message : "Unable to reach server"}`,
+        },
       ]);
     } finally {
       setSending(false);
@@ -80,111 +106,58 @@ export default function ChatPage() {
   if (!user) return null;
 
   return (
-    <main style={{ maxWidth: 720, margin: "0 auto", padding: "24px 16px" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 24,
-        }}
-      >
+    <main className="max-w-2xl mx-auto px-4 py-6">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>
-            Customer Support
-          </h1>
-          <p style={{ margin: "4px 0 0", fontSize: 14, color: "#6b7280" }}>
+          <h1 className="text-2xl font-bold text-support-text m-0">Customer Support</h1>
+          <p className="text-sm text-support-text-muted mt-1">
             {user.full_name} · {user.email}
           </p>
         </div>
-        <button
-          onClick={() => router.push("/auth/login")}
-          style={{
-            padding: "8px 16px",
-            fontSize: 13,
-            border: "1px solid #d1d5db",
-            borderRadius: 6,
-            background: "#fff",
-            cursor: "pointer",
-          }}
-        >
+        <Button variant="secondary" size="sm" onClick={() => router.push("/auth/login")}>
           Sign out
-        </button>
+        </Button>
       </div>
 
-      <div
-        style={{
-          border: "1px solid #e5e7eb",
-          borderRadius: 8,
-          padding: 16,
-          minHeight: 400,
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <div style={{ flex: 1, overflowY: "auto", marginBottom: 16 }}>
-          {messages.length === 0 && (
-            <p style={{ color: "#9ca3af", textAlign: "center", marginTop: 120 }}>
-              Send a message to start a conversation.
-            </p>
+      <div className="border border-support-border rounded-lg bg-white flex flex-col min-h-[500px]">
+        <div className="flex-1 overflow-y-auto p-4 space-y-1">
+          {ticketStatus === "escalated" && (
+            <EscalationBanner
+              reason="Your request has been escalated to a human agent for review."
+              className="mb-4"
+            />
           )}
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              style={{
-                marginBottom: 12,
-                textAlign: msg.role === "customer" ? "right" : "left",
-              }}
-            >
-              <span
-                style={{
-                  display: "inline-block",
-                  padding: "8px 14px",
-                  borderRadius: 12,
-                  fontSize: 14,
-                  lineHeight: 1.5,
-                  maxWidth: "80%",
-                  background: msg.role === "customer" ? "#3b82f6" : "#f3f4f6",
-                  color: msg.role === "customer" ? "#fff" : "#111",
-                }}
-              >
-                {msg.content}
-              </span>
-            </div>
-          ))}
+
+          {messages.length === 0 ? (
+            <ChatEmptyState onSuggestionClick={handleSuggestionClick} />
+          ) : (
+            messages.map((msg, i) => (
+              <MessageBubble
+                key={i}
+                role={msg.role}
+                content={msg.content}
+                citations={msg.citations}
+                ticketStatus={msg.ticketStatus}
+              />
+            ))
+          )}
+
+          {sending && <TypingIndicator />}
+
           <div ref={bottomRef} />
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", gap: 8 }}>
-          <input
+        <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-support-border p-4">
+          <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Type your message..."
             disabled={sending}
-            style={{
-              flex: 1,
-              padding: "10px 14px",
-              fontSize: 14,
-              border: "1px solid #d1d5db",
-              borderRadius: 6,
-            }}
+            className="flex-1"
           />
-          <button
-            type="submit"
-            disabled={sending || !input.trim()}
-            style={{
-              padding: "10px 20px",
-              fontSize: 14,
-              border: "none",
-              borderRadius: 6,
-              background: "#3b82f6",
-              color: "#fff",
-              cursor: sending ? "not-allowed" : "pointer",
-              opacity: sending ? 0.6 : 1,
-            }}
-          >
-            {sending ? "..." : "Send"}
-          </button>
+          <Button type="submit" disabled={sending || !input.trim()}>
+            {sending ? "Sending..." : "Send"}
+          </Button>
         </form>
       </div>
     </main>
