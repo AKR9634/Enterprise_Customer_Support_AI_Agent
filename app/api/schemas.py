@@ -254,3 +254,20 @@ class EscalationContextOut(BaseModel):
     confidence: float | None = None
     retrieved_docs: list[dict] = []
     business_data: dict = {}
+
+
+class ResolvedEscalationResponse(BaseModel):
+    id: str
+    ticket_id: str
+    category: str | None = None
+    customer_message: str | None = None
+    escalation_reason: str
+    draft_response: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    assigned_reviewer: str | None = None
+    final_reply: str | None = None
+
+
+class ResolvedEscalationListResponse(BaseModel):
+    resolved_escalations: list[ResolvedEscalationResponse]

@@ -125,6 +125,9 @@ export default function AgentPage() {
         </div>
         <div className="flex items-center gap-3">
           <AgentStatusToggle />
+          <Button variant="ghost" size="sm" onClick={() => router.push("/agent/resolved")}>
+            Resolved
+          </Button>
           <Button variant="ghost" size="sm" onClick={() => router.push("/auth/login")}>
             Sign out
           </Button>

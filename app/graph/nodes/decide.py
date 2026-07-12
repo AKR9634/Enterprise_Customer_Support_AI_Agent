@@ -29,15 +29,21 @@ class DecideNode:
         intent_confidence = state.get("intent_confidence")
         grounding_ok = state.get("grounding_ok", False)
 
-        # ── Cap confidence when ungrounded ────────────────────────────────
-        effective_confidence: float | None
-        if grounding_ok:
-            effective_confidence = intent_confidence
+        # ── Force escalation when no knowledge context was found ──────────
+        retrieved_docs = state.get("retrieved_docs") or []
+        if not retrieved_docs:
+            escalate = True
+            reason = "No relevant knowledge base context found for this question."
+            effective_confidence = None
         else:
-            effective_confidence = 0.0
+            # ── Cap confidence when ungrounded ────────────────────────────
+            if grounding_ok:
+                effective_confidence = intent_confidence
+            else:
+                effective_confidence = 0.0
 
-        # ── Evaluate escalation ───────────────────────────────────────────
-        escalate, reason = EscalationService.evaluate(effective_confidence)
+            # ── Evaluate escalation ───────────────────────────────────────
+            escalate, reason = EscalationService.evaluate(effective_confidence)
 
         # ── Assemble outputs ──────────────────────────────────────────────
         result: dict[str, Any] = {
