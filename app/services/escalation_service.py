@@ -133,6 +133,11 @@ class EscalationService:
         )
         return escalation
 
+    def list_resolved(self, conn: Connection, agent_id: str) -> list[Any]:
+        escalations = EscalationRepository.list_resolved(conn, agent_id)
+        logger.info("escalations_resolved_listed", agent_id=agent_id, count=len(escalations))
+        return escalations
+
     def list_queued(self, conn: Connection) -> list[Any]:
         """Return all queued escalations sorted by priority then oldest-first."""
         escalations = EscalationRepository.list_queued(conn)

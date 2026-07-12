@@ -16,6 +16,8 @@ from app.api.schemas import (
     EscalationContextOut,
     EscalationListResponse,
     EscalationOut,
+    ResolvedEscalationListResponse,
+    ResolvedEscalationResponse,
 )
 from app.repositories.conversation_repository import ConversationRepository
 from app.services.escalation_service import EscalationConflictError
@@ -23,6 +25,36 @@ from app.services.escalation_service import EscalationConflictError
 router = APIRouter(prefix="/escalations", tags=["escalations"])
 
 AgentDep = Annotated[dict, Depends(require_role("agent"))]
+
+
+@router.get("/resolved", response_model=ResolvedEscalationListResponse)
+def list_resolved_escalations(
+    db: DbDep,
+    agent: AgentDep,
+    svc: EscalationServiceDep,
+):
+    escalations = svc.list_resolved(db, str(agent["id"]))
+    resolved = []
+    for e in escalations:
+        final_reply = None
+        messages = ConversationRepository.list_by_ticket(db, str(e.ticket_id))
+        agent_msgs = [m for m in messages if m.role == "agent"]
+        if agent_msgs:
+            final_reply = agent_msgs[-1].content
+
+        resolved.append(ResolvedEscalationResponse(
+            id=str(e.id),
+            ticket_id=str(e.ticket_id),
+            category=e.category,
+            customer_message=e.customer_message,
+            escalation_reason=e.escalation_reason,
+            draft_response=e.draft_response,
+            created_at=e.created_at,
+            updated_at=e.updated_at,
+            assigned_reviewer=str(e.assigned_reviewer) if e.assigned_reviewer else None,
+            final_reply=final_reply,
+        ))
+    return ResolvedEscalationListResponse(resolved_escalations=resolved)
 
 
 @router.get("", response_model=EscalationListResponse)

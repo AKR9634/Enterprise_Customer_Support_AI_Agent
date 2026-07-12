@@ -128,6 +128,17 @@ class EscalationRepository:
             return _row_to_escalation(row)
 
     @staticmethod
+    def list_resolved(conn: Connection, reviewer_id: str) -> list[Escalation]:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM escalations "
+                "WHERE assigned_reviewer = %s AND status = 'resolved' "
+                "ORDER BY updated_at DESC",
+                (reviewer_id,),
+            )
+            return [_row_to_escalation(row) for row in cur.fetchall()]
+
+    @staticmethod
     def claim_atomic(conn: Connection, escalation_id: str, reviewer_id: str) -> Optional[Escalation]:
         with conn.cursor() as cur:
             cur.execute(
