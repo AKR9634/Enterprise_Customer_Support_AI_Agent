@@ -1,27 +1,26 @@
 services:
-  test-db:
-    image: postgres:16
-
-    container_name: support-ai-test-db
-
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: support-ai-api
     restart: unless-stopped
-
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: support_ai_test
-
+    env_file:
+      - .env
     ports:
-      - "5433:5432"
+      - "8000:8000"
 
-    volumes:
-      - postgres_test_data:/var/lib/postgresql/data
-
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-volumes:
-  postgres_test_data:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        BACKEND_API_URL: http://api:8000
+    container_name: support-ai-frontend
+    restart: unless-stopped
+    environment:
+      BACKEND_API_URL: http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api

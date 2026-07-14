@@ -1,0 +1,15 @@
+frontend
+tests
+.git
+.github
+.env
+.env.*
+!.env.example
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.venv
+venv
+*.md
+docker-compose*.yml
