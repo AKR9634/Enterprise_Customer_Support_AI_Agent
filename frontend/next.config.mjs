@@ -1,18 +1,21 @@
 /** @type {import('next').NextConfig} */
+const API_URL = process.env.BACKEND_API_URL || "http://localhost:8000";
+
 const nextConfig = {
+  output: "standalone",
   async rewrites() {
     return [
       {
         source: "/escalations/:path*",
-        destination: "http://localhost:8000/escalations/:path*",
+        destination: `${API_URL}/escalations/:path*`,
       },
       {
         source: "/chat/:path*",
-        destination: "http://localhost:8000/chat/:path*",
+        destination: `${API_URL}/chat/:path*`,
       },
       {
         source: "/tickets/:path*",
-        destination: "http://localhost:8000/tickets/:path*",
+        destination: `${API_URL}/tickets/:path*`,
       },
     ];
   },
