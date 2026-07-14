@@ -4,6 +4,7 @@ export interface CardProps {
   children: ReactNode;
   className?: string;
   padding?: "none" | "sm" | "md" | "lg";
+  onClick?: () => void;
 }
 
 const paddingMap: Record<string, string> = {
@@ -13,10 +14,11 @@ const paddingMap: Record<string, string> = {
   lg: "p-6",
 };
 
-export function Card({ children, className = "", padding = "md" }: CardProps) {
+export function Card({ children, className = "", padding = "md", onClick }: CardProps) {
   return (
     <div
       className={`border border-support-border rounded-lg bg-white ${paddingMap[padding]} ${className}`}
+      onClick={onClick}
     >
       {children}
     </div>
