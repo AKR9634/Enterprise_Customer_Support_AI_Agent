@@ -4,6 +4,7 @@ escalations/auth routers, and registers startup checks.
 """
 
 import logging
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,9 +29,19 @@ def warmup():
     get_model()
     logger.info("Embedding model loaded.")
 
+cors_allowed_origins_env = os.environ.get("CORS_ALLOWED_ORIGINS")
+if cors_allowed_origins_env:
+    cors_allowed_origins = [
+        origin.strip()
+        for origin in cors_allowed_origins_env.split(",")
+        if origin.strip()
+    ]
+else:
+    cors_allowed_origins = ["http://localhost:3000", "http://localhost:3001"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=cors_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
