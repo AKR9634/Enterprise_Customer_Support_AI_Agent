@@ -17,6 +17,8 @@ interface AuthContextType {
   logout: () => void;
 }
 
+const BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8000";
+
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -27,7 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem("access_token");
     if (saved) {
       setToken(saved);
-      fetch("http://localhost:8000/auth/me", {
+      fetch(`${BACKEND_API_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${saved}` },
       })
         .then((res) => {
@@ -40,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function login(email: string, password: string) {
-    const res = await fetch("http://localhost:8000/auth/login", {
+    const res = await fetch(`${BACKEND_API_URL}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -53,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("access_token", data.access_token);
     setToken(data.access_token);
 
-    const meRes = await fetch("http://localhost:8000/auth/me", {
+    const meRes = await fetch(`${BACKEND_API_URL}/auth/me`, {
       headers: { Authorization: `Bearer ${data.access_token}` },
     });
     if (!meRes.ok) throw new Error("Failed to fetch user");
@@ -63,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function register(email: string, fullName: string, password: string) {
-    const res = await fetch("http://localhost:8000/auth/register", {
+    const res = await fetch(`${BACKEND_API_URL}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, full_name: fullName, password }),
@@ -76,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("access_token", data.access_token);
     setToken(data.access_token);
 
-    const meRes = await fetch("http://localhost:8000/auth/me", {
+    const meRes = await fetch(`${BACKEND_API_URL}/auth/me`, {
       headers: { Authorization: `Bearer ${data.access_token}` },
     });
     if (!meRes.ok) throw new Error("Failed to fetch user");
