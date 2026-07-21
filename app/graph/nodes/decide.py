@@ -28,13 +28,20 @@ class DecideNode:
     def __call__(self, state: SupportState) -> dict[str, Any]:
         intent_confidence = state.get("intent_confidence")
         grounding_ok = state.get("grounding_ok", False)
+        category = state.get("category")
 
         # ── Force escalation when no knowledge context was found ──────────
+        # Skip for "general" category — greetings and chitchat don't need KB.
         retrieved_docs = state.get("retrieved_docs") or []
         if not retrieved_docs:
-            escalate = True
-            reason = "No relevant knowledge base context found for this question."
-            effective_confidence = None
+            if category == "general":
+                escalate = False
+                reason = None
+                effective_confidence = intent_confidence or 0.95
+            else:
+                escalate = True
+                reason = "No relevant knowledge base context found for this question."
+                effective_confidence = None
         else:
             # ── Cap confidence when ungrounded ────────────────────────────
             if grounding_ok:
