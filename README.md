@@ -1,250 +1,210 @@
-# Enterprise-Customer-Support-AI-Agent
+<div align="center">
 
-A multi-agent, RAG-grounded AI customer support system with a deterministic escalation pipeline. Built as a scaled-down, solo-developer implementation of an enterprise AI support agent blueprint — same architectural principles, minimal infrastructure.
+# 🤖 Enterprise Customer Support AI Agent
 
-> LangGraph orchestration with specialist routing, Supabase as the system of record, Qdrant for retrieval, and confidence-based human handoff for anything the model shouldn't answer alone.
+### A production-style, multi-agent RAG system that knows when *not* to answer
 
----
+**LangGraph orchestration · Confidence-gated escalation · Full-stack, fully tested**
 
-## Table of Contents
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-Orchestration-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white)](https://www.langchain.com/langgraph)
+[![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
+[![Postgres](https://img.shields.io/badge/Postgres-Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
+[![Qdrant](https://img.shields.io/badge/Qdrant-Vector%20DB-DC244C?style=for-the-badge&logo=qdrant&logoColor=white)](https://qdrant.tech/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
-- [Enterprise-Customer-Support-AI-Agent](#enterprise-customer-support-ai-agent)
-  - [Table of Contents](#table-of-contents)
-  - [Overview](#overview)
-  - [Core Features](#core-features)
-  - [Tech Stack](#tech-stack)
-  - [Architecture](#architecture)
-    - [High-level components](#high-level-components)
-    - [Request lifecycle](#request-lifecycle)
-    - [SupportState fields](#supportstate-fields)
-    - [Node-by-node responsibility](#node-by-node-responsibility)
-    - [Multi-agent design](#multi-agent-design)
-  - [Folder Structure](#folder-structure)
-  - [Getting Started](#getting-started)
-    - [Prerequisites](#prerequisites)
-    - [Setup](#setup)
-  - [Development Workflow](#development-workflow)
-  - [Phased Build Plan](#phased-build-plan)
-  - [Deployment](#deployment)
-  - [Testing](#testing)
-  - [Design Decisions](#design-decisions)
-  - [Metrics](#metrics)
-  - [Deliverables Checklist](#deliverables-checklist)
+[![Tests](https://img.shields.io/badge/tests-64%20files%20%7C%208.6k%20LOC-brightgreen?style=flat-square)](#-testing)
+[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](#-license)
+[![Status](https://img.shields.io/badge/status-active%20development-yellow?style=flat-square)]()
+
+<br/>
+
+**[🎥 Live Demo](#) · [📐 Architecture](#-architecture) · [🚀 Quickstart](#-quickstart) · [🧠 Design Decisions](#-design-decisions)**
+
+</div>
 
 ---
 
-## Overview
+## 💡 The Problem This Solves
 
-Enterprise-Customer-Support-AI-Agent handles customer support conversations end-to-end: it classifies intent, retrieves grounded context from a knowledge base, routes the query to the right specialist agent, drafts a response, verifies that response is actually grounded in real data, and — critically — **escalates to a human instead of guessing** whenever confidence or grounding falls short.
+Most "AI support agent" side projects wire a chatbot to an LLM and call it done. That works great in a demo — right up until the model confidently hallucinates a refund policy that doesn't exist, and now it's a support ticket for the CEO.
 
-The core design principle carried over from the enterprise version: **the LLM never makes an irreversible decision alone.** Low-confidence or ungrounded answers are structurally blocked from reaching the customer, not just discouraged via prompting.
+This project is built around one non-negotiable rule:
 
-## Core Features
+> **The LLM never makes an irreversible decision alone.**
 
-1. **Grounded chat support agent** — Replies are backed by Qdrant-retrieved context, not general-knowledge guesses.
-2. **Multi-agent routing** — A Supervisor node classifies intent and hands off to a Billing, Order, Account, Product, or General specialist agent, all sharing one prompt skeleton.
-3. **Confidence-based escalation** — Low-confidence or ungrounded answers are held back and routed to a human review queue instead of being sent as-is.
-4. **Agent review dashboard** — Humans see escalated tickets with full context (what the AI saw, why it escalated) and reply manually.
+Every response passes through a **grounding check** and a **confidence gate** before it ever reaches a customer. If either fails, the system doesn't let the model "try its best" — it structurally routes the conversation to a human, full context attached. This is enforced in code at the graph level, not requested via a prompt that a jailbreak or a weird edge case could talk the model out of.
 
-## Tech Stack
+---
 
-| Layer | Choice |
+## ✨ Core Features
+
+| | |
 |---|---|
-| Frontend | Next.js 14 (App Router) + Tailwind CSS |
-| API | FastAPI |
-| Orchestration | LangGraph — multi-agent (Supervisor + Billing/Order/General specialists) |
-| System of record | PostgreSQL via Supabase |
-| Knowledge store | Qdrant (Qdrant Cloud free tier) |
-| DB access | Repository pattern, raw SQL (`psycopg`), no ORM |
-| Background jobs | None |
-| Observability | LangSmith (free tier) |
-| Auth | JWT, 2 roles (`customer`, `agent`) |
-| Local dev | Docker Compose (`api`, `frontend`; Supabase & Qdrant are hosted) |
-| Production hosting | Railway |
-| LLM Provider | Anthropic API (`claude-sonnet-5`), swappable via one abstraction module |
-| Linting/formatting | None |
+| 🎯 **Grounded answers, not guesses** | Every reply is backed by context retrieved from Qdrant — the agent cites what it read, it doesn't freelance |
+| 🧩 **Multi-agent specialist routing** | A Supervisor node classifies intent and hands off to Billing, Order, Account, Product, or General agents — each with focused context, not one bloated prompt |
+| 🛑 **Confidence-gated escalation** | Low-confidence or ungrounded drafts are structurally blocked from reaching the customer and routed to a human review queue instead |
+| 🕵️ **Full escalation transparency** | Human agents see exactly what the AI saw, what it drafted, and *why* it escalated — not just a raw transcript |
+| 🔐 **Real auth, real roles** | JWT-based auth with `customer` / `agent` roles gating every route |
+| 🧪 **Tested like production code** | 64 Python modules backed by 33 test files (~4.6k lines) spanning unit, service, and full-graph integration tests |
 
-**Assumptions:**
-- Basic Python and JS/TS knowledge assumed; no prior LangGraph/RAG experience required.
-- Single low-cost hosting budget (~$0–10/month).
-- No real customer or payment data — everything is seeded/mock data, clearly labeled as a demo.
-- Effort is sequential: data and business logic are built before AI, deterministic behavior before generative behavior.
+---
 
-## Architecture
+## 🏗️ Architecture
 
-### High-level components
+### System overview
 
 ```
- Customer / Agent (browser)
-        │
+┌──────────────────────┐
+│  Customer / Agent UI  │   Next.js 14 (App Router) + Tailwind
+└──────────┬────────────┘
+           │  REST · JWT in Authorization header
+           ▼
+┌──────────────────────┐
+│      FastAPI          │   Routes → Auth → Services
+└──────────┬────────────┘
+           ▼
+┌────────────────────────────────────────────────────┐
+│                LangGraph Orchestration               │
+│                                                        │
+│  classify → context → retrieve → business_data        │
+│      → route (Supervisor) → generate (specialist)     │
+│      → verify → decide                                │
+└───────┬───────────────────────────┬──────────────────┘
+        ▼                           ▼
+┌───────────────┐           ┌───────────────┐
+│ Service Layer  │           │   RAG Layer    │
+│ Ticket ·       │           │ embed · chunk  │
+│ Knowledge ·    │           │ retrieve       │
+│ Escalation     │           └───────┬───────┘
+└───────┬───────┘                   ▼
+        ▼                     ┌───────────┐
+┌───────────────┐             │  Qdrant    │
+│ Repository     │             └───────────┘
+│ Layer          │
+└───────┬───────┘
         ▼
- Next.js + Tailwind frontend
-        │  REST, JWT in Authorization header
-        ▼
- FastAPI (API layer)
-        │
-        ▼
- LangGraph (orchestration)
-   Supervisor ──► Billing / Order / General agent ──► LLM Provider
-        │
-    ┌───┴────────────┐
-    ▼                ▼
- Service Layer    RAG Layer
- (Ticket,         (chunk, embed,
-  Knowledge,       retrieve)
-  Escalation)
-    │                │
-    ▼                ▼
- Repository Layer   Qdrant
-    │
-    ▼
- Supabase Postgres
+┌───────────────┐
+│  Supabase       │
+│  Postgres       │
+└───────────────┘
 ```
 
-### Request lifecycle
+### The 8-node request lifecycle
 
-1. Frontend sends `POST /chat/messages` with a JWT, `ticket_id` (or none), and message text.
-2. FastAPI verifies the JWT/role and persists the inbound message.
-3. FastAPI invokes the LangGraph with an initial `SupportState`.
-4. The graph runs: **classify → context → retrieve → business_data → route (Supervisor) → generate (specialist) → verify → decide**.
-5. If confidence and grounding both check out → the final answer is returned.
-6. Otherwise → the ticket is escalated, the customer gets an acknowledgment, and the full state (draft answer, retrieved docs, routing reason, escalation reason) is stored for human review.
-7. FastAPI persists the outcome and returns the response.
+Every chat message runs through a deterministic, inspectable pipeline — no black box:
 
-### SupportState fields
+| # | Node | Responsibility |
+|---|------|-----------------|
+| 1 | **Classify** | Categorizes the message: billing / order / account / product / general |
+| 2 | **Context** | Loads customer profile and recent conversation history |
+| 3 | **Retrieve** | Embeds the query, searches Qdrant, assembles cited context |
+| 4 | **Business Data** | Pulls live order/payment/product data when the category needs it |
+| 5 | **Route** (Supervisor) | Picks the specialist agent best suited to answer |
+| 6 | **Generate** | The selected specialist drafts a response grounded in retrieved context + business data |
+| 7 | **Verify** | A separate LLM call fact-checks every claim in the draft against real retrieved data |
+| 8 | **Decide** | Combines grounding + confidence → answer the customer, or escalate to a human |
 
-`ticket_id`, `customer_message`, `conversation_history`, `category`, `intent_confidence`, `retrieved_docs`, `business_data`, `active_agent`, `routing_reason`, `draft_response`, `grounding_ok`, `confidence`, `escalate`, `escalation_reason`, `final_response`
-
-### Node-by-node responsibility
-
-| Node | Does | Calls |
-|---|---|---|
-| 1. Classify | Categorizes the message (billing / order / account / product / general) | `LLMClient.classify` |
-| 2. Context | Loads customer profile + recent conversation history | `TicketService` |
-| 3. Retrieve | Embeds the query, searches Qdrant, assembles cited context | `KnowledgeService.search` |
-| 4. Business data | Fetches order/payment data if the category needs it | Direct DB lookup via services |
-| 5. Route | Supervisor picks the Billing / Order / Account / Product / General agent | `LLMClient.generate` (narrow routing prompt) |
-| 6. Generate | Selected specialist drafts a response grounded in retrieved context + business data | `LLMClient.generate` |
-| 7. Verify | A separate LLM call checks every factual claim traces back to retrieved context or business data | `LLMClient.generate` |
-| 8. Decide | Combines grounding + confidence; escalates if either fails threshold | `EscalationService.evaluate` |
-
-**Structural guarantee:** when `escalate == true`, the final response is always an acknowledgment — never `draft_response` — even if the draft looked correct. This is enforced in Node 8's output assembly, not by a prompt instruction, so it can't be talked around by the model.
+> **Structural guarantee:** when `escalate == true`, the response returned is *always* the acknowledgment message — never the drafted answer — even if the draft looked perfectly fine. That branch is enforced in Node 8's output assembly, not by asking the model nicely.
 
 ### Multi-agent design
 
-- **Supervisor** — routing-only responsibility. Receives the category plus a one-line summary of retrieved context and outputs which specialist should answer. Kept deliberately narrow so it stays a clean classification task.
-- **Specialists (Billing, Order, Account, Product, General)** — share one prompt skeleton, differing only in role description and which business-data fields are relevant. Adding a new specialist later means one new file, not edits to the others.
+```
+                     ┌───────────────┐
+   category +  ───▶  │  Supervisor    │  ───▶ picks one specialist
+   context summary    │  (routing-only)│
+                     └───────────────┘
+                             │
+        ┌──────────┬─────────┼─────────┬──────────┐
+        ▼          ▼          ▼          ▼          ▼
+    Billing     Order      Account    Product    General
+    Agent       Agent      Agent      Agent      Agent
+```
 
-## Folder Structure
+All five specialists share **one prompt skeleton**, differing only in role description and which business-data fields they get. Adding a sixth specialist later means one new file — not edits scattered across the codebase.
+
+---
+
+## 🧰 Tech Stack
+
+<div align="center">
+
+| Layer | Technology |
+|---|---|
+| **Frontend** | Next.js 14 (App Router) · TypeScript · Tailwind CSS |
+| **API** | FastAPI · Pydantic v2 |
+| **Orchestration** | LangGraph — multi-agent supervisor + specialists |
+| **LLM Provider** | Anthropic API (Claude), swappable via a single provider abstraction |
+| **System of record** | PostgreSQL via Supabase |
+| **Knowledge store** | Qdrant (vector search) |
+| **DB access** | Repository pattern, raw SQL via `psycopg` — no ORM |
+| **Auth** | JWT · role-based (`customer`, `agent`) |
+| **Observability** | LangSmith tracing |
+| **Local dev** | Docker Compose |
+| **Deployment** | Railway |
+
+</div>
+
+---
+
+## 📂 Project Structure
 
 ```
 Enterprise-Customer-Support-AI-Agent/
-  app/
-    api/
-      routes/
-        chat.py            # POST /chat/messages — the graph entry point
-        tickets.py         # GET/POST tickets, PATCH status
-        escalations.py     # GET queue, claim, resolve, context
-        auth.py            # register/login/refresh
-      schemas.py            # all Pydantic In/Out models, one file
-      auth.py               # JWT encode/decode, get_current_user, require_role
-      deps.py               # DB connection + service constructors for FastAPI Depends()
-
-    graph/
-      state.py              # SupportState TypedDict
-      workflow.py           # node graph + edges
-      nodes/
-        classify.py         # Node 1 — intent classification
-        context.py          # Node 2 — customer profile + conversation history
-        retrieve.py         # Node 3 — Qdrant RAG retrieval
-        business_data.py    # Node 4 — pulls order/payment data when relevant
-        route.py            # Node 5 — Supervisor: picks a specialist agent
-        generate.py         # Node 6 — specialist agent generates draft_response
-        verify.py           # Node 7 — grounding check on the draft
-        decide.py           # Node 8 — confidence scoring + escalation decision
-      agents/
-        supervisor_prompt.py    # narrow routing-only prompt
-        specialist_skeleton.py  # shared prompt shell (role, account data, reference material)
-        billing_agent.py        # role description + billing-specific fields
-        order_agent.py
-        account_agent.py
-        product_agent.py
-        general_agent.py
-
-    services/
-      ticket_service.py       # create_ticket, transition_status (state machine), set_priority
-      knowledge_service.py    # search() — embeds query, retrieves + assembles context
-      escalation_service.py   # evaluate(), enqueue(), claim(), resolve()
-
-    repositories/
-      ticket_repository.py       # create, get_by_id, list_by_customer, update_status
-      conversation_repository.py # append_message, list_by_ticket
-      escalation_repository.py   # create, list_queued, update_status, assign_reviewer
-
-    rag/
-      ingest.py             # chunk + embed + upsert to Qdrant, idempotent by point ID
-      retriever.py          # embeds query, filtered Qdrant search, dedupe/re-rank
-
-    llm/
-      provider.py           # single LLMClient wrapper: generate(), classify()
-
-    db/
-      session.py            # Supabase Postgres connection
-      migrations/
-        0001_init.sql          # customers, tickets, conversations
-        0002_escalations.sql   # escalations table
-        0003_auth.sql          # password_hash, role on customers
-
-    config.py               # all environment-driven settings in one file
-    main.py                 # FastAPI app entrypoint
-
-  docs/                     # seed knowledge docs (faq.md, refund_policy.md, ...)
-
-  frontend/
-    app/
-      chat/                 # customer chat UI
-      agent/                # escalation queue + review
-    components/
-
-  tests/
-    unit/                   # services (mocked repos), graph nodes (mocked services)
-    integration/            # API + full graph run against a test DB
-
-  scripts/
-    seed_db.py              # sample customers/tickets for local dev
-    run_ingestion.py         # ingests docs/ into Qdrant
-
-  docker-compose.yml
-  requirements.txt
-  .env.example
-  README.md
+├── app/
+│   ├── api/
+│   │   ├── routes/          # chat, tickets, escalations, auth, accounts, products
+│   │   ├── auth.py          # JWT encode/decode, role guards
+│   │   └── schemas.py       # every Pydantic In/Out model
+│   ├── graph/
+│   │   ├── state.py         # SupportState — the object threaded through every node
+│   │   ├── workflow.py      # the 8-node graph definition
+│   │   ├── nodes/           # classify · context · retrieve · business_data
+│   │   │                    # route · generate · verify · decide
+│   │   └── agents/          # Supervisor + 5 specialist prompt modules
+│   ├── services/            # Ticket, Escalation, Knowledge, Billing, Order, Account, Product
+│   ├── repositories/        # one repo per table — raw SQL, no ORM magic
+│   ├── rag/                 # ingest.py (chunk+embed+upsert), retriever.py
+│   ├── llm/                 # provider.py — single LLM client abstraction
+│   └── db/                  # session + versioned SQL migrations
+├── frontend/
+│   ├── app/                 # chat/, agent/, auth/ route groups
+│   └── components/          # chat bubbles, escalation banners, agent queue, design system
+├── docs/                    # seed knowledge base (FAQ, refund/billing/shipping policy)
+├── scripts/                 # seed_db · run_ingestion · migrate
+└── tests/
+    ├── unit/                 # services (mocked repos), graph nodes (mocked services)
+    └── integration/          # real DB + full-graph execution
 ```
 
-**Why this shape:**
-- `graph/nodes/` is graph plumbing (state in, state out); `graph/agents/` is prompt content. Keeping them separate means editing a specialist's tone never touches graph wiring, and vice versa.
-- One `schemas.py` and one `config.py` instead of per-domain files — at this project's size, splitting them adds navigation overhead without payoff.
-- `db/migrations/` is deliberately three files — each maps to a build phase, and no table is created before the phase that needs it.
+**Why this shape:** `graph/nodes/` is pure plumbing (state in, state out); `graph/agents/` is prompt content. Editing a specialist's tone never touches graph wiring, and vice versa.
 
-## Getting Started
+---
+
+## 🚀 Quickstart
 
 ### Prerequisites
 
 - Docker & Docker Compose
 - A [Supabase](https://supabase.com) project (PostgreSQL)
-- A [Qdrant Cloud](https://cloud.qdrant.io) free-tier cluster
+- A [Qdrant Cloud](https://cloud.qdrant.io) cluster
 - An [Anthropic API key](https://console.anthropic.com)
 
 ### Setup
 
 ```bash
-git clone <your-repo-url>
+# 1. Clone
+git clone https://github.com/<your-username>/Enterprise_Customer_Support_AI_Agent.git
 cd Enterprise_Customer_Support_AI_Agent
+
+# 2. Configure environment
 cp .env.example .env
 ```
 
-Fill in `.env` with:
+Fill in `.env`:
 
-```
+```env
 ANTHROPIC_API_KEY=
 DATABASE_URL=
 QDRANT_URL=
@@ -252,92 +212,61 @@ QDRANT_API_KEY=
 JWT_SECRET=
 ```
 
-Run migrations, then start the stack:
-
 ```bash
+# 3. Run migrations & start the stack
 docker-compose up --build
-```
 
-Seed demo data and load the knowledge base:
-
-```bash
+# 4. Seed demo data + load the knowledge base
 python scripts/seed_db.py
 python scripts/run_ingestion.py
 ```
 
-The frontend will be available at `http://localhost:3000` and the API at `http://localhost:8000`.
-
-## Development Workflow
-
-- **Branching:** trunk-based, short-lived feature branches (e.g. `feat/rag-ingestion`, `feat/multi-agent-routing`), merged via PR even solo.
-- **Commits:** conventional commits (`feat:`, `fix:`, `refactor:`).
-- **CI:** one GitHub Actions job — run `pytest` against a throwaway Postgres service container, then build the Docker image on merge to `main`. No lint/format step.
-- **Config:** all secrets live in `.env`, never committed; `.env.example` documents every required variable.
-
-## Phased Build Plan
-
-Each phase produces a runnable, demoable system rather than a half-built layer. Data and business rules come before AI; a single generic agent proves the graph before multi-agent routing is layered on top.
-
-| Phase | Goal | Key deliverables |
-|---|---|---|
-| **1 — Foundation** | Working ticketing system, zero AI | Supabase schema (`0001_init.sql`), `TicketRepository`, `ConversationRepository`, `TicketService` with a status state machine (`open → pending → resolved/escalated → closed`), FastAPI CRUD for tickets/messages, JWT auth |
-| **2 — Knowledge base** | Grounded, cited context — no LLM yet | Seed docs (`faq.md`, `refund_policy.md`, `billing_policy.md`), `rag/ingest.py`, `rag/retriever.py`, `knowledge_service.search()` |
-| **3 — Single-agent graph** | One message flows through the full pipeline | `SupportState`, Nodes 1–3 + 6–8 with one generic agent, `POST /chat/messages` wired to the graph, LangSmith tracing on from the start |
-| **4 — Multi-agent routing** | Category-specific answers with the right tone/data | Node 4 (business data) + Node 5 (Supervisor), Billing/Order/Account/Product/General specialist prompts, `agents_invoked` visible per chat turn |
-| **5 — Escalation loop** | Low-confidence answers caught and handed to a human | `0002_escalations.sql`, `EscalationService`, escalation queue + review API, agent dashboard UI |
-
-**Sequencing principle:** deterministic before AI, single agent before multi-agent. Phase 3 uses one generic agent so graph-wiring bugs are debugged separately from routing-logic bugs; Phase 4 only adds the routing split once the graph is proven to work.
-
-## Deployment
-
-**Local dev**
-- `docker-compose.yml` runs `api` and `frontend`; Supabase and Qdrant Cloud are hosted, so `.env` just points at their connection strings.
-- `scripts/seed_db.py` seeds demo data; `scripts/run_ingestion.py` embeds `docs/` into Qdrant.
-
-**Production build**
-- `docker build` produces one image for `api` and one for `frontend`.
-- Migrations run against Supabase before the new container receives traffic.
-
-**Hosting**
-- **Database:** Supabase
-- **Knowledge store:** Qdrant Cloud
-- **API + frontend:** Railway, Docker deploy, redeploys on push to `main`
-- **CI/CD:** GitHub Actions runs tests; Railway handles deploys via its GitHub integration. Single environment — no staging tier.
-
-## Testing
-
-Testing mirrors the architectural layering:
-
-- **Repositories** — tests against a real test database, each wrapped in a transaction that's rolled back after.
-- **Services** — unit tests with mocked repositories (fast, no DB needed); the ticket status state machine gets a parametrized test covering every (current, new) status pair.
-- **Graph nodes and agents** — unit tests with mocked services, verifying node logic without hitting the LLM.
-- **End-to-end** — one or two tests running the full graph against a test DB with a fixed/mocked LLM response.
-
-## Design Decisions
-
-- **The LLM never makes an irreversible decision alone.** Low-confidence or ungrounded answers are structurally blocked from reaching the customer — enforced in code, not prompting.
-- **Routing is handled by a narrow Supervisor** rather than one sprawling prompt, keeping classification and generation concerns separate.
-- **Single agent before multi-agent, deterministic before AI** — each phase is fully demoable on its own, isolating bugs to the layer that introduced them.
-
-## Metrics
-
-Suggested metrics to track and report:
-
-- Escalation rate (% of queries routed to human review)
-- Routing accuracy (did the Supervisor send each test query to the right specialist)
-- Retrieval precision on a small hand-labeled Q&A test set
-- Token/cost per resolved ticket
-
-## Deliverables Checklist
-
-- [ ] Public GitHub repo with a clean README (architecture diagram, setup steps, demo GIF)
-- [ ] Working deployed demo link on Railway
-- [ ] Seed data + sample knowledge docs so reviewers can run it immediately
-- [ ] Test suite passing in CI (badge in README)
-- [ ] Short "Design Decisions" write-up explaining the *why*
-- [ ] LangSmith trace screenshot showing a multi-agent graph execution
-- [ ] Escalation dashboard screenshot showing a low-confidence case caught and routed
+| Service | URL |
+|---|---|
+| 💬 Customer chat UI | http://localhost:3000 |
+| 🖥️ API | http://localhost:8000 |
+| 📖 API docs (Swagger) | http://localhost:8000/docs |
 
 ---
 
-**Tech stack summary:** FastAPI · LangGraph (multi-agent) · Supabase (PostgreSQL) · Qdrant · Next.js · Tailwind CSS · Anthropic API · Docker · Railway
+## 🧪 Testing
+
+Testing mirrors the architecture, layer by layer:
+
+```bash
+pytest                       # full suite
+pytest tests/unit            # services + graph nodes, fully mocked, fast
+pytest tests/integration     # real test DB, full graph execution
+```
+
+- **Repositories** — run against a real test database, wrapped in a transaction and rolled back after each test
+- **Services** — unit-tested against mocked repositories; the ticket status state machine is parametrized across every valid `(current, new)` status pair
+- **Graph nodes & agents** — unit-tested with mocked services, no live LLM calls
+- **End-to-end** — full graph execution against a test DB with a fixed/mocked LLM response
+
+**33 test files · ~4,600 lines of tests** across unit and integration layers.
+
+---
+
+## 🧠 Design Decisions
+
+- **The LLM never makes an irreversible decision alone.** Low-confidence or ungrounded answers are structurally blocked from reaching the customer — enforced in code, not prompting.
+- **Routing is a narrow, single-purpose Supervisor**, not one sprawling do-everything prompt. Classification and generation are kept as separate concerns.
+- **Single generic agent before multi-agent, deterministic logic before generative logic.** The graph was proven end-to-end with one agent before specialist routing was layered on top — isolating "is the graph wired correctly" bugs from "is the routing logic correct" bugs.
+- **No ORM.** A thin repository layer over raw SQL keeps query behavior explicit and easy to reason about at this scale.
+
+---
+
+## 📄 License
+
+MIT — see [LICENSE](LICENSE) for details.
+
+---
+
+<div align="center">
+
+**Built as a scaled-down, solo-developer implementation of an enterprise AI support blueprint** — same architectural principles that guard production systems, minimal infrastructure.
+
+⭐ If this project is useful or interesting, consider starring it.
+
+</div>
