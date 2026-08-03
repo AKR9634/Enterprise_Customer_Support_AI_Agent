@@ -9,7 +9,12 @@ from typing import Any
 
 from qdrant_client import QdrantClient
 
-from app.config import QDRANT_API_KEY, QDRANT_COLLECTION, QDRANT_URL
+from app.config import (
+    QDRANT_API_KEY,
+    QDRANT_COLLECTION,
+    QDRANT_URL,
+    RETRIEVAL_SCORE_THRESHOLD,
+)
 from app.rag.embedder import embed
 
 logger = logging.getLogger(__name__)
@@ -33,7 +38,7 @@ def search(
         query=query_vector,
         limit=top_k * 3,
         with_payload=True,
-        score_threshold=0.55,
+        score_threshold=RETRIEVAL_SCORE_THRESHOLD,
     )
 
     scored: list[dict[str, Any]] = []

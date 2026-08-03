@@ -15,6 +15,7 @@ OPEN_ROUTER_API_KEY: str = os.getenv("OPEN_ROUTER_API_KEY", "")
 
 # ── RAG / Ingestion ──────────────────────────────────────────────────────────
 QDRANT_COLLECTION: str = os.getenv("QDRANT_COLLECTION", "knowledge_base")
+RETRIEVAL_SCORE_THRESHOLD: float = float(os.getenv("RETRIEVAL_SCORE_THRESHOLD", "0.40"))
 EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "500"))
 CHUNK_OVERLAP: int = int(os.getenv("CHUNK_OVERLAP", "50"))

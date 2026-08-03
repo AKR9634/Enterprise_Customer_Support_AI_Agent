@@ -20,7 +20,7 @@
 
 <br/>
 
-**[🌐 Project Website](https://powerful-clarity-production-30db.up.railway.app/auth/login) · [📐 Architecture](#-architecture) · [🚀 Quickstart](#-quickstart) · [🧠 Design Decisions](#-design-decisions)**
+**[🌐 Project Website](http://54.210.50.10:3000/auth/login) · [📐 Architecture](#-architecture) · [🚀 Quickstart](#-quickstart) · [🧠 Design Decisions](#-design-decisions)**
 
 </div>
 

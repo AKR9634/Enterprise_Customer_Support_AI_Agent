@@ -1,0 +1,24 @@
+services:
+  api:
+    image: akr6723/support-ai-api:1.0.1
+    container_name: support-ai-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+
+  frontend:
+    image: akr6723/support-ai-frontend:1.0.0
+    container_name: support-ai-frontend
+    restart: unless-stopped
+    environment:
+      BACKEND_API_URL: http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+networks:
+  default:
+    enable_ipv6: true
