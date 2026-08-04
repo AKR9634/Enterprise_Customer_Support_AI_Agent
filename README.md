@@ -14,7 +14,7 @@
 [![Qdrant](https://img.shields.io/badge/Qdrant-Vector%20DB-DC244C?style=for-the-badge&logo=qdrant&logoColor=white)](https://qdrant.tech/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
-[![Tests](https://img.shields.io/badge/tests-64%20files%20%7C%208.6k%20LOC-brightgreen?style=flat-square)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-33%20files%20%7C%204.6k%20LOC-brightgreen?style=flat-square)](#-testing)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](#-license)
 [![Status](https://img.shields.io/badge/status-active%20development-yellow?style=flat-square)]()
 
@@ -135,14 +135,14 @@ All five specialists share **one prompt skeleton**, differing only in role descr
 | **Frontend** | Next.js 14 (App Router) · TypeScript · Tailwind CSS |
 | **API** | FastAPI · Pydantic v2 |
 | **Orchestration** | LangGraph — multi-agent supervisor + specialists |
-| **LLM Provider** | Anthropic API (Claude), swappable via a single provider abstraction |
+| **LLM Provider** | OpenRouter (ChatOpenAI), swappable via a single provider abstraction |
 | **System of record** | PostgreSQL via Supabase |
 | **Knowledge store** | Qdrant (vector search) |
 | **DB access** | Repository pattern, raw SQL via `psycopg` — no ORM |
 | **Auth** | JWT · role-based (`customer`, `agent`) |
 | **Observability** | LangSmith tracing |
 | **Local dev** | Docker Compose |
-| **Deployment** | Railway |
+| **Deployment** | Docker Hub + EC2 |
 
 </div>
 
@@ -189,7 +189,7 @@ Enterprise-Customer-Support-AI-Agent/
 - Docker & Docker Compose
 - A [Supabase](https://supabase.com) project (PostgreSQL)
 - A [Qdrant Cloud](https://cloud.qdrant.io) cluster
-- An [Anthropic API key](https://console.anthropic.com)
+- An [OpenRouter API key](https://openrouter.ai)
 
 ### Setup
 
@@ -205,11 +205,25 @@ cp .env.example .env
 Fill in `.env`:
 
 ```env
-ANTHROPIC_API_KEY=
+# Required
 DATABASE_URL=
+JWT_SECRET=
+
+# Vector Store (Qdrant Cloud)
 QDRANT_URL=
 QDRANT_API_KEY=
-JWT_SECRET=
+
+# LLM Provider (OpenRouter)
+OPEN_ROUTER_API_KEY=
+
+# Embedding Model (HuggingFace)
+HUGGINGFACEHUB_API_TOKEN=
+
+# Optional
+TEST_DATABASE_URL=
+LANGCHAIN_TRACING_V2=false
+LANGCHAIN_API_KEY=
+LANGCHAIN_PROJECT=Enterprise-Customer-Support-AI-Agent
 ```
 
 ```bash
