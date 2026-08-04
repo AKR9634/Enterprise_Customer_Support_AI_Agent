@@ -237,9 +237,8 @@ python scripts/run_ingestion.py
 
 | Service | URL |
 |---|---|
-| 💬 Customer chat UI | http://localhost:3000 |
-| 🖥️ API | http://localhost:8000 |
-| 📖 API docs (Swagger) | http://localhost:8000/docs |
+| 💬 Customer chat UI | http://54.210.50.10:3000/auth/login |
+| 📖 API docs (Swagger) | http://54.210.50.10:8000/docs |
 
 ---
 
