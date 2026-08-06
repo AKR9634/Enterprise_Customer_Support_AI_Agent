@@ -1,0 +1,574 @@
+================================================================================
+FINAL DEPLOYMENT LOG — FULL DETAILED WALKTHROUGH OF THIS SESSION
+Project : Enterprise Customer Support AI Agent
+Target  : Single AWS EC2 instance (Ubuntu 22.04), Docker Compose
+Registry: Docker Hub (akr6723)
+Date    : Session performed step by step, all steps executed and verified live
+================================================================================
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1.  Big picture — what we built and how the pieces connect
+2.  Before we started — what was already in the repo
+3.  Step-by-step execution log
+    3.1  Local environment checks
+    3.2  Backend image build (first attempt — 9.18 GB problem)
+    3.3  Dockerfile fix — CPU-only torch — rebuild to 2.64 GB
+    3.4  Push to Docker Hub (and the expired-login hiccup)
+    3.5  EC2 provisioning (AWS Console) + Elastic IP
+    3.6  Frontend image build — build args and WHY they exist
+    3.7  Deploy artifacts — docker-compose.prod.yml and prod .env
+    3.8  Installing Docker on the EC2
+    3.9  Deploy — copying files, pulling images, starting the stack
+    3.10 The IPv6 saga (Supabase direct connection) — 3 layers of fixes
+    3.11 One-time data setup — migrate / seed / ingest
+    3.12 Smoke tests — and the retrieval-threshold bug we found & fixed
+    3.13 Documentation produced (workflow.md, README.md, this file)
+4.  How environment variables are passed (the full mechanics)
+5.  Connections — who talks to whom, and over what
+6.  Final state of the deployment
+7.  Files changed during this session
+8.  Security notes and recommended follow-ups
+
+================================================================================
+1. BIG PICTURE — WHAT WE BUILT AND HOW THE PIECES CONNECT
+================================================================================
+
+The application is a 3-tier stack:
+
+    Browser (Next.js frontend)
+        |
+        |  port 3000  (customer chat + agent dashboard)
+        v
+    Next.js server (frontend container, "frontend")
+        |  internal Docker network, http://api:8000
+        v
+    FastAPI backend (api container, "api")
+        |  psycopg + IPv6  -> Supabase Postgres (hosted)
+        |  qdrant-client   -> Qdrant Cloud (hosted)
+        |  ChatOpenAI      -> OpenRouter (LLM)
+        |  langsmith       -> LangSmith (tracing)
+        |  HuggingFace     -> embedding model download (all-MiniLM-L6-v2)
+
+Deployment model chosen (with the user):
+    - Build BOTH images on the local machine.
+    - Tag and push them to Docker Hub (public repos under namespace "akr6723").
+    - On a single EC2 instance, run `docker compose up` using an image-based
+      compose file (docker-compose.prod.yml). The EC2 pulls the images from
+      Docker Hub and runs the containers on the same Docker network.
+
+Key architectural facts that drove every decision:
+
+  a) The Next.js frontend makes TWO kinds of API calls:
+       - Server-side rewrites for /chat, /tickets, /escalations  -> BACKEND_API_URL
+       - Browser-side (client JS) calls for /auth/login, /auth/register, /auth/me
+         -> NEXT_PUBLIC_BACKEND_API_URL
+     NEXT_PUBLIC_* values are INLINED INTO THE JS BUNDLE at `next build` time.
+     That means the EC2 public IP had to be known BEFORE building the frontend
+     image, and changing the domain later forces a frontend rebuild.
+
+  b) /auth/* is NOT covered by the Next.js rewrites (frontend/next.config.mjs),
+     so the browser talks to the FastAPI container DIRECTLY on port 8000.
+     Cross-origin => CORS must allow the frontend origin. The app reads
+     CORS_ALLOWED_ORIGINS at startup (app/main.py) — we set it in prod .env.
+
+  c) The Supabase DATABASE_URL hostname resolves ONLY to IPv6 (AAAA record).
+     This single fact caused the biggest detour of the session (see section 3.10).
+
+  d) The backend warms up by downloading the HuggingFace embedding model at
+     startup (app/main.py warmup handler) -> the EC2 needs outbound internet.
+
+================================================================================
+2. BEFORE WE STARTED — WHAT WAS ALREADY IN THE REPO
+================================================================================
+
+Relevant existing files (we read all of these first):
+
+  - Dockerfile                (backend): python:3.11-slim, apt build deps
+                                (build-essential, libpq-dev, curl), then
+                                `pip install -r requirements.txt`, copies
+                                app/, docs/, scripts/. Runs uvicorn on PORT 8000.
+  - frontend/Dockerfile       multi-stage: deps -> builder (runs `next build`
+                                with output: standalone) -> runner (copies
+                                .next/standalone). Reads build args
+                                BACKEND_API_URL and NEXT_PUBLIC_BACKEND_API_URL.
+  - docker-compose.yml        LOCAL dev compose: both services use `build:`,
+                                api gets env_file .env, frontend gets
+                                BACKEND_API_URL=http://api:8000.
+  - .env.example              documented the real required keys:
+                                DATABASE_URL, JWT_SECRET, QDRANT_URL,
+                                QDRANT_API_KEY, OPEN_ROUTER_API_KEY,
+                                HUGGINGFACEHUB_API_TOKEN, TEST_DATABASE_URL,
+                                LANGCHAIN_TRACING_V2, LANGCHAIN_API_KEY,
+                                LANGCHAIN_PROJECT.
+  - .env                      (gitignored, exists locally) — real values for
+                                DATABASE_URL (Supabase direct host), QDRANT_URL
+                                + QDRANT_API_KEY (Qdrant Cloud), HF token,
+                                LangSmith keys, JWT_SECRET, OPEN_ROUTER_API_KEY,
+                                OPENAI_API_KEY (bedrock-signed token present in
+                                the file but NOT consumed by app code).
+  - app/config.py             reads all env vars via os.getenv with defaults.
+  - app/llm/provider.py       LLMClient wraps ChatOpenAI with
+                                api_key=config.OPEN_ROUTER_API_KEY and
+                                base_url=config.OPEN_ROUTER_BASE_URL.
+  - app/rag/retriever.py      Qdrant search with a hardcoded score_threshold.
+  - scripts/migrate.py, seed_db.py, run_ingestion.py   (one-time data setup)
+  - AGENTS.md                 states design rules (direct DB connection, no
+                                pooler; single LLM call site; etc.).
+
+Docker on the machine: Docker 29.3.1, Compose v5.1.1, engine running, and the
+Docker config already contained Docker Hub credentials.
+
+================================================================================
+3. STEP-BY-STEP EXECUTION LOG
+================================================================================
+
+--------------------------------------------------------------------------------
+3.1 Local environment checks
+--------------------------------------------------------------------------------
+- Ran `docker --version` (29.3.1), `docker compose version` (v5.1.1),
+  `docker info` (server 29.3.1 -> engine running).
+- Inspected ~/.docker/config.json and confirmed a Docker Hub auth entry exists.
+- Asked the user for their Docker Hub username -> "akr6723".
+- Confirmed region us-east-1 and that EC2 would be created via AWS Console.
+
+--------------------------------------------------------------------------------
+3.2 Backend image build (first attempt — the 9.18 GB problem)
+--------------------------------------------------------------------------------
+Command:
+    docker build -t akr6723/support-ai-api:1.0.0 -t akr6723/support-ai-api:latest .
+
+Result: image built, but it was 9.18 GB.
+Root cause (visible in the build log): requirements.txt pins
+sentence-transformers>=2.2.0 which depends on torch>=1.11.0. pip resolved
+torch 2.13.0, and on Linux the default torch wheel now bundles the FULL CUDA
+runtime. The build downloaded nvidia-cudnn, nvidia-nccl, nvidia-cublas,
+nvidia-cusolver, triton, etc. (~5.5 GB of unused packages), because the app only
+runs embeddings on CPU.
+
+Why it matters: the EC2 would have to pull 9.18 GB, and on a 20 GB disk that is
+wasteful and slow.
+
+We asked the user; they chose "Shrink image with CPU torch (Recommended)".
+
+--------------------------------------------------------------------------------
+3.3 Dockerfile fix — CPU-only torch -> 2.64 GB
+--------------------------------------------------------------------------------
+Edited root Dockerfile. Before the requirements install we added:
+
+    RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+    RUN pip install --no-cache-dir -r requirements.txt
+
+Mechanics: installing torch from the CPU index first means the wheel is
+torch-2.13.0+cpu (191.8 MB). When pip later resolves sentence-transformers'
+torch>=1.11.0 requirement, the already-installed CPU torch satisfies it, so pip
+does NOT pull the CUDA build from PyPI.
+
+Rebuilt: `docker build -t akr6723/support-ai-api:1.0.0 -t akr6723/support-ai-api:latest .`
+New image size: 2.64 GB. (Also tagged 1.0.1 later for the threshold fix —
+see 3.12. Final running tag: 1.0.1.)
+
+--------------------------------------------------------------------------------
+3.4 Push to Docker Hub (and the expired-login hiccup)
+--------------------------------------------------------------------------------
+    docker push akr6723/support-ai-api:1.0.0
+    docker push akr6723/support-ai-api:latest
+
+First push worked. Then, when re-pushing after a rebuild, we hit:
+    "insufficient_scope: authorization failed"
+-> the stored Docker Hub credential had expired. Fix: the user ran
+   `docker login` on their machine with username akr6723 and an access token.
+   Retry succeeded. (Lesson: Docker Hub tokens expire; re-login when you see
+   insufficient_scope.)
+
+Verified on hub.docker.com via the unauthenticated tags API:
+   tag 1.0.0 -> digest sha256:b10407... ; tag latest -> same digest.
+
+--------------------------------------------------------------------------------
+3.5 EC2 provisioning (AWS Console) + Elastic IP
+--------------------------------------------------------------------------------
+User created (per our detailed console walkthrough):
+  - Instance name  : support-ai-prod
+  - AMI            : Ubuntu 22.04 LTS (HVM)
+  - Type           : t3.small  (2 vCPU / 2 GB RAM — enough for uvicorn + the
+                     ~90 MB embedding model in RAM; t3.medium is the headroom
+                     option)
+  - Key pair       : RSA / .pem ("support-ai-key")
+  - Security group : support-ai-sg, inbound:
+                      TCP 22   (SSH)
+                      TCP 3000 (frontend)
+                      TCP 8000 (API/auth from browser)
+  - Storage        : 20 GiB gp3
+  - Elastic IP allocated and associated -> PUBLIC IP = 54.210.50.10
+
+IMPORTANT ordering consequence: because NEXT_PUBLIC_ is baked at build time,
+we deliberately created the EC2 + got the Elastic IP BEFORE building the
+frontend image, so the IP was known when we built it.
+
+--------------------------------------------------------------------------------
+3.6 Frontend image build — build args and WHY they exist
+--------------------------------------------------------------------------------
+Command (from repo root, build context = ./frontend):
+
+    docker build \
+      --build-arg BACKEND_API_URL=http://api:8000 \
+      --build-arg NEXT_PUBLIC_BACKEND_API_URL=http://54.210.50.10:8000 \
+      -t akr6723/support-ai-frontend:1.0.0 \
+      -t akr6723/support-ai-frontend:latest \
+      frontend
+
+Values explained:
+  - BACKEND_API_URL=http://api:8000
+      Used by next.config.mjs rewrites (server-side). "api" is the Docker
+      Compose SERVICE NAME, so the Next server reaches the FastAPI container by
+      DNS inside the shared compose network. It MUST stay "api" to match
+      docker-compose.prod.yml.
+  - NEXT_PUBLIC_BACKEND_API_URL=http://54.210.50.10:8000
+      Inlined into AuthContext.tsx's bundle for browser /auth/* calls. This is
+      the public address the browser must reach.
+
+Result: image size 320 MB, build log shows "Compiled successfully".
+Pushed: akr6723/support-ai-frontend:1.0.0 and :latest
+        (digest sha256:4e653528...).
+
+Note the .dockerignore for the frontend excludes .env/.env.* -> no secrets in
+the image, and the ENV values are passed as ARG/ENV only for the build; secrets
+are NOT in this image at all.
+
+--------------------------------------------------------------------------------
+3.7 Deploy artifacts — docker-compose.prod.yml and prod .env
+--------------------------------------------------------------------------------
+Created docker-compose.prod.yml (in repo root). Key differences vs the local
+docker-compose.yml:
+  - `image:` instead of `build:` for both services
+  - api: image akr6723/support-ai-api:1.0.1 (final), env_file: .env, ports 8000:8000
+  - frontend: image akr6723/support-ai-frontend:1.0.0, environment
+    BACKEND_API_URL=http://api:8000, ports 3000:3000, depends_on api
+  - networks.default.enable_ipv6: true   (added later — see 3.10)
+
+Prod .env generation: we built .env.prod by TRANSFORMING the local .env so the
+real secret values were never printed to the chat:
+  - copied every existing key verbatim
+  - REMOVED TEST_DATABASE_URL
+  - REGENERATED JWT_SECRET to a fresh 64-hex-char value
+  - ADDED CORS_ALLOWED_ORIGINS=http://54.210.50.10:3000
+  - NORMALIZED all lines to `KEY=value` with NO spaces around `=`
+    (Docker's strict --env-file parser rejects `KEY = value`; the original
+    .env had `QDRANT_API_KEY = ...` and `QDRANT_URL = ...` which broke it).
+
+Final key set in .env.prod:
+  DATABASE_URL, QDRANT_API_KEY, QDRANT_URL, HUGGINGFACEHUB_API_TOKEN,
+  LANGCHAIN_TRACING_V2, LANGCHAIN_API_KEY, LANGCHAIN_ENDPOINT,
+  LANGCHAIN_PROJECT, OPEN_ROUTER_API_KEY, OPENAI_API_KEY, JWT_SECRET,
+  CORS_ALLOWED_ORIGINS.
+(The app reads everything else from defaults in app/config.py.)
+
+Validated with: docker compose -f docker-compose.prod.yml config.
+
+--------------------------------------------------------------------------------
+3.8 Installing Docker on the EC2
+--------------------------------------------------------------------------------
+Initial attempt inlined a long one-liner via SSH; PowerShell mangled the
+`$(...)` quoting. Solution: write a bash script locally, scp it to the box,
+run it. Installed:
+  docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin,
+  docker-compose-plugin  (result: Docker 29.7.1, Compose v5.4.0)
+and added ubuntu to the docker group.
+
+--------------------------------------------------------------------------------
+3.9 Deploy — copying files, pulling images, starting the stack
+--------------------------------------------------------------------------------
+   sudo mkdir -p /opt/support-ai && sudo chown ubuntu:ubuntu /opt/support-ai
+   scp docker-compose.prod.yml  ubuntu@54.210.50.10:/opt/support-ai/
+   scp .env.prod                ubuntu@54.210.50.10:/opt/support-ai/.env
+                                                            ^-- renamed to .env
+   ssh ... "cd /opt/support-ai && docker compose -f docker-compose.prod.yml up -d"
+
+Docker Hub public repos => no docker login needed on the EC2 to pull.
+Compose pulled both images and started containers:
+  support-ai-api      (0.0.0.0:8000->8000)
+  support-ai-frontend (0.0.0.0:3000->3000)
+
+First checks: API /docs returned 200 (after embedding-model warmup),
+frontend /chat returned 200. Root "/" returned 404 — expected, no home page.
+
+--------------------------------------------------------------------------------
+3.10 The IPv6 saga (Supabase direct connection) — 3 layers of fixes
+--------------------------------------------------------------------------------
+PROBLEM: when running migrations we got
+    psycopg.OperationalError: ... connection to server at
+    "2406:da14:1772:ea01:995a:e8ba:6d59:da2c", port 5432 failed:
+    Network is unreachable
+
+DIAGNOSIS (getent ahosts on the EC2):
+    db.okvnguvhukxwodknuwww.supabase.co -> IPv6 ONLY (single AAAA record,
+    no A record). The local dev machine had IPv6; the EC2 had none, and
+    Supabase's direct-connection hostname is IPv6-only. (This is a known
+    Supabase behavior. AGENTS.md mandates the direct connection, not the
+    IPv4 pooler.) The user chose "Enable IPv6 on EC2".
+
+THREE SEPARATE LAYERS all needed fixing — this is the subtle part:
+
+  LAYER 1 — the EC2 network itself (AWS Console):
+    * VPC  vpc-0c803114bd1a5272e  -> Actions -> Edit CIDRs -> Add IPv6 CIDR
+      (Amazon-provided)
+    * Subnet subnet-0f786e0e6cdc5656e -> Edit IPv6 CIDRs -> add the /64
+      AND enable "Auto-assign IPv6 address" on the subnet
+    * Route table -> add ::/0 -> Internet Gateway
+    * Instance -> Networking -> Manage IP addresses -> Assign new IPv6 address
+    Verified: instance got 2600:1f18:62f:dd00:ba34:5c98:72d1:9eb1,
+    `curl -6 https://www.google.com` -> 200, and a raw TCP test to
+    2406:da14:...:5432 succeeded FROM THE HOST.
+
+  LAYER 2 — the Docker DAEMON (default bridge):
+    After Layer 1, one-off `docker run` tests STILL failed. Reason: the Docker
+    default bridge network is IPv4-only by default. Fix:
+        echo '{"ipv6": true, "fixed-cidr-v6": "fd00:1:1:1::/64"}' \
+             | sudo tee /etc/docker/daemon.json
+        sudo systemctl restart docker
+    Docker >= 25 performs NAT66 automatically, so containers get outbound IPv6
+    through the host's global address. Verified inside a container:
+        DB-TCP-OK to the Supabase IPv6:5432.
+
+  LAYER 3 — the COMPOSE network (user-defined bridge):
+    The compose stack runs on its own network "support-ai_default", which had
+    been created BEFORE IPv6 was enabled, so it was IPv4-only even though the
+    daemon now supported IPv6. That is why the API container still said
+    "Network is unreachable" while a fresh `docker run` worked.
+    Fix (in docker-compose.prod.yml):
+        networks:
+          default:
+            enable_ipv6: true
+    Then `docker compose -f docker-compose.prod.yml down` (removes the old
+    network) and `up -d` (recreates it with IPv6). Verified:
+        docker network inspect support-ai_default -> EnableIPv6: true,
+        IPv6 subnet fddd:68ac:b6cf::/64, container got fddd:68ac:b6cf::2.
+    (If the network had been created after the daemon change, just `up` would
+    have been enough — but `down` guarantees a fresh network.)
+
+After all three layers: register/login/chat smoke tests passed.
+
+--------------------------------------------------------------------------------
+3.11 One-time data setup — migrate / seed / ingest
+--------------------------------------------------------------------------------
+Ran INSIDE the api image so the exact same prod .env is used, via
+`docker run --rm --env-file .env ...`:
+
+  1) docker run --rm --env-file .env akr6723/support-ai-api:1.0.1 \
+        python scripts/migrate.py
+     -> all 5 migrations SKIP (already applied — the Supabase project was
+        already migrated during local dev; migrate.py tracks applied files in
+        schema_migrations and is idempotent).
+  2) ... python scripts/seed_db.py
+     -> seeded products (Widget Pro, Gadget X, Premium Support Add-on),
+        orders, subscriptions, invoices, addresses, account metadata,
+        product specs, warranties, inventory.
+  3) ... python scripts/run_ingestion.py
+     -> "Ingested 6 doc(s) -> 46 chunk(s) -> upserted 46 point(s) to
+        'knowledge_base'"  (docs/*.md chunked+embedded+upserted to Qdrant).
+
+--------------------------------------------------------------------------------
+3.12 Smoke tests — and the retrieval-threshold bug we found & fixed
+--------------------------------------------------------------------------------
+End-to-end smoke test (register -> login -> chat) using JSON payload files
+(PowerShell mangles inline JSON for curl.exe, so we used -d "@file.json"):
+
+  POST /auth/register  -> access_token
+  POST /auth/login     -> access_token
+  POST /chat/messages  {"message":"What is the return policy for a defective
+                        Widget Pro?"}
+  with header Authorization: Bearer <token>
+
+FIRST run of the chat call escalated:
+    escalated: true
+    escalation_reason: "No relevant knowledge base context found for this question."
+
+Investigation: we ran a direct Qdrant search for the same question and found
+the refund-policy chunk DID match, but its score was 0.5218 — and
+app/rag/retriever.py had a HARDCODED `score_threshold=0.55`. Every legitimate
+match was below the gate, so retrieval returned nothing and the graph escalated
+everything. all-MiniLM-L6-v2 cosine scores for relevant chunks on this KB sit
+around 0.45-0.55, so 0.55 was too strict.
+
+FIX (chosen by user: "Configurable, default 0.40"):
+  - app/config.py: added
+        RETRIEVAL_SCORE_THRESHOLD = os.getenv("RETRIEVAL_SCORE_THRESHOLD", "0.40")
+  - app/rag/retriever.py: import it and use it instead of the literal 0.55.
+Rebuild as version 1.0.1 (also re-tagged latest):
+    docker build -t akr6723/support-ai-api:1.0.1 -t akr6723/support-ai-api:latest .
+    docker push akr6723/support-ai-api:1.0.1
+    docker push akr6723/support-ai-api:latest
+Updated docker-compose.prod.yml to image akr6723/support-ai-api:1.0.1, scp'd
+it, `docker compose up -d` (recreated only the api container).
+
+RE-TEST (chat via the API and via the frontend rewrite at :3000):
+    escalated: false
+    response: grounded answer combining the warranty-claim process and the
+    30-day refund policy.
+CORS check (browser origin):
+    curl -H "Origin: http://54.210.50.10:3000" http://54.210.50.10:8000/auth/me
+    -> HTTP 401 (expected, no token) AND
+       access-control-allow-origin: http://54.210.50.10:3000  (+ credentials)
+       => CORS is wired correctly for the deployed origin.
+
+--------------------------------------------------------------------------------
+3.13 Documentation produced
+--------------------------------------------------------------------------------
+  - workflow.md        — reusable deployment runbook (image build, env vars,
+                         EC2 provisioning incl. IPv6, gotchas, upgrade/rollback).
+  - README.md          — corrected stale content (see section 7).
+  - final_dep.txt      — this file.
+
+================================================================================
+4. HOW ENVIRONMENT VARIABLES ARE PASSED (FULL MECHANICS)
+================================================================================
+
+There are FOUR distinct paths for configuration in this deployment:
+
+  (1) BUILD-TIME build args -> baked into the frontend image:
+        ARG BACKEND_API_URL / ARG NEXT_PUBLIC_BACKEND_API_URL
+      Values were supplied on the `docker build` command line. The Next.js
+      compiler inlines NEXT_PUBLIC_* into the JS bundle (AuthContext.tsx) and
+      next.config.mjs reads BACKEND_API_URL when assembling the standalone
+      server. These are FIXED once built — they cannot be changed at runtime
+      without rebuilding the image. This is why the EC2 IP had to be known
+      before the frontend build.
+
+  (2) RUNTIME env_file (api service only):
+        env_file: - .env    (docker-compose.prod.yml)
+      Compose reads /opt/support-ai/.env line by line (KEY=value, no spaces)
+      and injects every variable into the api container's process environment.
+      The container's Python then reads them in app/config.py via os.getenv().
+      This is where ALL secrets live: DATABASE_URL, QDRANT_*, OPEN_ROUTER_*,
+      JWT_SECRET, HF token, LangSmith keys, CORS_ALLOWED_ORIGINS.
+      IMPORTANT: these are NOT baked into the image — .env is in .dockerignore
+      for both builds, so the image layers contain no secrets. The .env file
+      exists only on the EC2 (and as .env.prod, gitignored, on the machine).
+
+  (3) RUNTIME environment (frontend service):
+        environment: BACKEND_API_URL: http://api:8000
+      Passed directly in the compose file. The Next standalone server reads it
+      per request for the server-side rewrites (it also got the build-time
+      value, but this runtime value wins for the running server).
+
+  (4) Process environment of one-off containers:
+        docker run --rm --env-file .env akr6723/support-ai-api:1.0.1 python ...
+      Used for migrate/seed/ingest so the one-time scripts hit the same prod
+      DB/Qdrant with the same credentials as the running API.
+
+Other important env-related notes:
+  - app/config.py has sane defaults for everything not supplied
+    (JWT_ALGORITHM HS256, JWT_EXPIRY_HOURS 24, QDRANT_COLLECTION
+    knowledge_base, EMBEDDING_MODEL all-MiniLM-L6-v2, CHUNK_SIZE 500,
+    CHUNK_OVERLAP 50, LLM_MODEL gpt-4o-mini, OPEN_ROUTER_BASE_URL
+    https://openrouter.ai/api/v1, LLM_TEMPERATURE 0.0, LLM_MAX_TOKENS 1024,
+    CONFIDENCE_THRESHOLD 0.7, RETRIEVAL_SCORE_THRESHOLD 0.40,
+    ESCALATION_ACKNOWLEDGMENT default text, LANGSMITH_TRACING false).
+  - CORS_ALLOWED_ORIGINS is read in app/main.py; if absent it falls back to
+    localhost:3000/3001 — which is why we HAD to set it for the EC2 origin.
+  - The original .env used `KEY = value` (spaces). Docker's env-file parser
+    rejects that; we normalized to `KEY=value`.
+
+================================================================================
+5. CONNECTIONS — WHO TALKS TO WHOM, AND OVER WHAT
+================================================================================
+
+  Browser  --HTTPS?/HTTP-->  :3000   Next.js frontend (customer + agent UI)
+  Browser  --HTTP-->         :8000   FastAPI /auth/* only (CORS-enabled)
+  Next.js server --HTTP-->   api:8000 (Docker DNS) — rewrites for
+                             /chat, /tickets, /escalations
+  FastAPI   --psycopg-->     db.<ref>.supabase.co:5432   over IPv6 (NAT66)
+  FastAPI   --qdrant-client--> Qdrant Cloud  https://4f2ea9a1-...eu-central-1-0.aws.cloud.qdrant.io
+                             (bearer api key from env)
+  FastAPI   --ChatOpenAI-->  OpenRouter   https://openrouter.ai/api/v1
+                             (api_key from env, model gpt-4o-mini default)
+  FastAPI   --langsmith-->   https://api.smith.langchain.com  (tracing)
+  FastAPI   --huggingface--> download all-MiniLM-L6-v2 at startup
+
+  EC2 host networking:
+    Security group opens 22/3000/8000 inbound.
+    Outbound fully open (default) — needed for IPv6 to Supabase, Qdrant,
+    OpenRouter, HF, LangSmith.
+
+================================================================================
+6. FINAL STATE OF THE DEPLOYMENT
+================================================================================
+
+  Instance      : support-ai-prod, Ubuntu 22.04, t3.small, us-east-1
+  Public IP     : 54.210.50.10  (Elastic IP)
+  Compose file  : /opt/support-ai/docker-compose.prod.yml
+  Env file      : /opt/support-ai/.env   (12 keys incl. CORS + fresh JWT)
+  Containers    : support-ai-api     (akr6723/support-ai-api:1.0.1)
+                  support-ai-frontend(akr6723/support-ai-frontend:1.0.0)
+                  both restart: unless-stopped, on one IPv6-enabled compose net
+  Docker        : 29.7.1, daemon ipv6 enabled (fd00:1:1:1::/64 NAT66)
+  Data          : migrations applied, demo data seeded, 46 KB chunks in Qdrant
+  URLs:
+    UI / login   http://54.210.50.10:3000/auth/login
+    Chat UI      http://54.210.50.10:3000/chat
+    Agent dash   http://54.210.50.10:3000/agent
+    API/Swagger  http://54.210.50.10:8000/docs
+
+  Verified live: register/login/chat through both :8000 and the :3000 rewrite,
+  grounded answer (escalated:false), CORS headers correct, LangSmith traces.
+
+================================================================================
+7. FILES CHANGED / CREATED DURING THIS SESSION
+================================================================================
+
+  Modified:
+    Dockerfile                    CPU-only torch before requirements (image 2.64 GB)
+    app/config.py                 added RETRIEVAL_SCORE_THRESHOLD (default 0.40)
+    app/rag/retriever.py          use RETRIEVAL_SCORE_THRESHOLD instead of 0.55
+    README.md                     corrected stale content (test badge/numbers,
+                                  4.6k->3.6k, 64->105 modules; also already-updated
+                                  by the user: OpenRouter LLM, Docker Hub+EC2
+                                  deployment row, OpenRouter prereq, env block,
+                                  EC2 URLs)
+  Created (repo):
+    docker-compose.prod.yml       image-based prod compose + enable_ipv6
+    workflow.md                   deployment runbook
+    final_dep.txt                 this file
+  Created (local only, gitignored):
+    .env.prod                     prod env derived from .env (secrets stay local)
+  On the EC2 (outside git):
+    /opt/support-ai/docker-compose.prod.yml, /opt/support-ai/.env,
+    /etc/docker/daemon.json (ipv6)
+  Temp (local):
+    support-ai-key.pem (private key), payload JSON files for smoke tests,
+    helper shell scripts — all outside the repo (AppData\Local\Temp\opencode).
+
+  Docker Hub images now published:
+    akr6723/support-ai-api:1.0.0 (superseded), :1.0.1 (running), :latest
+    akr6723/support-ai-frontend:1.0.0, :latest
+
+  Nothing was committed to git (no commits made this session).
+
+================================================================================
+8. SECURITY NOTES AND RECOMMENDED FOLLOW-UPS
+================================================================================
+
+  1. The EC2 private key was pasted into chat during this session. It is stored
+     at C:\Users\Dell\AppData\Local\Temp\opencode\support-ai-key.pem. Treat it
+     as exposed -> rotate the key pair (or at least stop using it) after the
+     demo, and never reuse it.
+  2. .env.prod contains live API keys. It is gitignored. Never commit it, never
+     paste it, never build it into an image.
+  3. JWT_SECRET was rotated for prod; other keys match local. Rotate any key
+     that has ever appeared in chat/logs.
+  4. Recommended next step: a Caddy/nginx reverse proxy on 80/443 with a domain.
+     Benefits: closes the public 8000 port, kills CORS entirely, enables HTTPS.
+     Cost: one frontend image rebuild with NEXT_PUBLIC_BACKEND_API_URL set to
+     the new domain (build-time inlining).
+  5. Backups: state lives in Supabase (enable point-in-time recovery) and
+     Qdrant (enable snapshots). The EC2 is stateless — rebuild it anytime with
+     the two images + .env.
+  6. Upgrade/rollback is tag-based: edit the image tag in
+     docker-compose.prod.yml, `docker compose -f docker-compose.prod.yml pull`
+     and `up -d` to upgrade; point the tag back to roll back. Keep old tags on
+     Docker Hub.
+
+================================================================================
+END OF LOG
+================================================================================

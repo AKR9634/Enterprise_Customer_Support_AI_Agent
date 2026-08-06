@@ -14,7 +14,7 @@
 [![Qdrant](https://img.shields.io/badge/Qdrant-Vector%20DB-DC244C?style=for-the-badge&logo=qdrant&logoColor=white)](https://qdrant.tech/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
-[![Tests](https://img.shields.io/badge/tests-33%20files%20%7C%204.6k%20LOC-brightgreen?style=flat-square)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-33%20files%20%7C%203.6k%20LOC-brightgreen?style=flat-square)](#-testing)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](#-license)
 [![Status](https://img.shields.io/badge/status-active%20development-yellow?style=flat-square)]()
 
@@ -47,7 +47,7 @@ Every response passes through a **grounding check** and a **confidence gate** be
 | 🛑 **Confidence-gated escalation** | Low-confidence or ungrounded drafts are structurally blocked from reaching the customer and routed to a human review queue instead |
 | 🕵️ **Full escalation transparency** | Human agents see exactly what the AI saw, what it drafted, and *why* it escalated — not just a raw transcript |
 | 🔐 **Real auth, real roles** | JWT-based auth with `customer` / `agent` roles gating every route |
-| 🧪 **Tested like production code** | 64 Python modules backed by 33 test files (~4.6k lines) spanning unit, service, and full-graph integration tests |
+| 🧪 **Tested like production code** | 105 Python modules backed by 33 test files (~3.6k lines) spanning unit, service, and full-graph integration tests |
 
 ---
 
@@ -257,7 +257,7 @@ pytest tests/integration     # real test DB, full graph execution
 - **Graph nodes & agents** — unit-tested with mocked services, no live LLM calls
 - **End-to-end** — full graph execution against a test DB with a fixed/mocked LLM response
 
-**33 test files · ~4,600 lines of tests** across unit and integration layers.
+**33 test files · ~3,600 lines of tests** across unit and integration layers.
 
 ---
 
